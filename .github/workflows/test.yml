@@ -1,7 +1,7 @@
-name: Test, build and deploy main
+name: Run tests & build image
 on:
   push:
-    branches:
+    branches-ignore:
       - main
     paths-ignore:
       - '**.md'
@@ -9,7 +9,6 @@ jobs:
   build:
     permissions:
       contents: read
-      id-token: write
     runs-on: ubuntu-latest
     environment: prod-gcp:appsec
     steps:
@@ -22,9 +21,4 @@ jobs:
         id: docker-push
         with:
           team: appsec
-          push_image: true
-      - uses: nais/deploy/actions/deploy@655191e618af58744d594ab4226aeac78dc739ec # ratchet:nais/deploy/actions/deploy@v2
-        env:
-          RESOURCE: .nais/nais.yaml
-          CLUSTER: prod-gcp
-          IMAGE: ${{ steps.docker-push.outputs.image }}
+          push_image: false

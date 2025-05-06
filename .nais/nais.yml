@@ -31,6 +31,11 @@ spec:
     - secret: appsec-github-watcher
   ingresses:
     - https://appsec-github-watcher.nav.no
+  accessPolicy:
+    outbound:
+      external:
+        - host: api.github.com
+        - host: slack.com
   env:
     - name: EMAIL_FROM_ADDRESS
       value: "appsec@nav.no"

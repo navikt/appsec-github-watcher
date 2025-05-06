@@ -66,6 +66,15 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 3. Run the application: `go run cmd/appsec-github-watcher/main.go`
 4. Build the Docker image: `docker build .`
 
+## Email Templates
+
+The application uses Go's `embed` package to include email templates directly in the compiled binary:
+
+- Template files are located in `internal/msgraph/templates/`
+- The welcome email template is in `welcome_email.html`
+- Templates are automatically embedded into the binary at build time - no need to distribute template files separately
+- To modify email content, update the HTML template files before building
+
 ## Testing
 
 Run tests with: `go test ./...`

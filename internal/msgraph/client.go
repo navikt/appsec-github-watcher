@@ -4,6 +4,7 @@ package msgraph
 import (
 	"bytes"
 	"context"
+	"embed"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -21,6 +22,9 @@ const (
 	maxRetries             = 3
 	baseDelay              = 100 * time.Millisecond
 )
+
+//go:embed templates/*.html
+var templateFS embed.FS
 
 var log = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
@@ -248,57 +252,14 @@ func (g *graphClient) SendWelcomeEmail(userEmail, userName string) error {
 
 // generateWelcomeEmailBody creates the HTML body for the welcome email
 func generateWelcomeEmailBody(userName string) (string, error) {
-	// Email template with GitHub security etiquette information
-	const emailTemplate = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Our GitHub Organization</title>
-</head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #24292e;">Welcome to Our GitHub Organization!</h1>
-    </div>
-    
-    <p>Hello {{.UserName}},</p>
-    
-    <p>We're excited to welcome you to our GitHub organization. As a new member, we want to make sure you're familiar with our security best practices.</p>
-    
-    <h2 style="color: #24292e; margin-top: 20px;">GitHub Security Best Practices</h2>
-    
-    <ul style="padding-left: 20px;">
-        <li><strong>Enable Two-Factor Authentication:</strong> 2FA is required for all members. Please ensure it's set up on your GitHub account.</li>
-        <li><strong>Use SSH keys:</strong> For repository access, use SSH keys instead of passwords whenever possible.</li>
-        <li><strong>Be careful with secrets:</strong> Never commit API keys, passwords, or other secrets to repositories.</li>
-        <li><strong>Keep dependencies updated:</strong> Regularly update dependencies to avoid security vulnerabilities.</li>
-        <li><strong>Review code changes:</strong> All code should be peer-reviewed before merging to main branches.</li>
-        <li><strong>Understand repository permissions:</strong> Only request access to repositories you need to work with.</li>
-    </ul>
-    
-    <h2 style="color: #24292e; margin-top: 20px;">Useful Resources</h2>
-    
-    <ul style="padding-left: 20px;">
-        <li><a href="https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa" style="color: #0366d6;">Setting up 2FA</a></li>
-        <li><a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh" style="color: #0366d6;">Using SSH with GitHub</a></li>
-        <li><a href="https://docs.github.com/en/github/administering-a-repository/configuration-options-for-dependency-updates" style="color: #0366d6;">Dependabot configuration</a></li>
-    </ul>
-    
-    <p style="margin-top: 30px;">If you have any questions about our GitHub security policies or need assistance, please don't hesitate to reach out to the security team.</p>
-    
-    <p>Best regards,<br>
-    The AppSec Team</p>
-    
-    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #6a737d; text-align: center;">
-        <p>This is an automated message. Please do not reply to this email.</p>
-    </div>
-</body>
-</html>
-`
+	// Load the template from the embedded file system
+	tmplFile, err := templateFS.ReadFile("templates/welcome_email.html")
+	if err != nil {
+		return "", fmt.Errorf("failed to read email template file: %w", err)
+	}
 
 	// Parse the template
-	tmpl, err := template.New("welcomeEmail").Parse(emailTemplate)
+	tmpl, err := template.New("welcomeEmail").Parse(string(tmplFile))
 	if err != nil {
 		return "", fmt.Errorf("failed to parse email template: %w", err)
 	}

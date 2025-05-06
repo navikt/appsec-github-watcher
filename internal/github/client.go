@@ -13,7 +13,7 @@ import (
 
 // NewGraphQLClient creates a GitHub-v4 client authenticated as your App installation.
 func NewGraphQLClient(ctx context.Context) (*githubv4.Client, error) {
-	installationID := os.Getenv("GITHUB_INSTALLATION_ID")
+	installationID := os.Getenv("GITHUB_APP_INSTALLATION_ID")
 
 	// load private key from env
 	privateKeyPEM := os.Getenv("GITHUB_APP_PRIVATE_KEY")

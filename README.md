@@ -19,7 +19,7 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 ### GitHub Application
 - `GITHUB_WEBHOOK_SECRET_KEY` Generated secret we use to verify that the payload is sent from our webhook.
 - `GITHUB_APP_ID` The GitHub App ID used for authentication.
-- `GITHUB_INSTALLATION_ID` The GitHub App installation ID used for authentication.
+- `GITHUB_APP_INSTALLATION_ID` The GitHub App installation ID used for authentication.
 - `GITHUB_APP_PRIVATE_KEY` The private key used for GitHub App authentication.
 - `GITHUB_ORGANIZATION` The GitHub organization name to fetch SAML identity information.
 

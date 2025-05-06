@@ -1,28 +1,80 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/navikt/appsec-github-watcher/internal/handlers"
+	"github.com/navikt/appsec-github-watcher/internal/msgraph"
+	"github.com/navikt/appsec-github-watcher/internal/slack"
+)
+
+const (
+	slackUserGroupId = "S0604QSJC"
 )
 
 func main() {
 	log := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	log.Info(fmt.Sprintf("Starting appsec-github-watcher"))
+	log.Info("Starting appsec-github-watcher")
 
 	webhookSecretKey := os.Getenv("GITHUB_WEBHOOK_SECRET_KEY")
+	if webhookSecretKey == "" {
+		log.Error("Missing required environment variable: GITHUB_WEBHOOK_SECRET_KEY")
+		os.Exit(1)
+	}
 
+	// Initialize Slack client
+	slackClient, err := slack.NewSlackClient()
+	if err != nil {
+		log.Error("Failed to initialize Slack client", slog.Any("error", err))
+		os.Exit(1)
+	}
+
+	// Check feature toggle for email functionality
+	var emailClient msgraph.EmailClient
+	enableEmail := isFeatureEnabled("ENABLE_EMAIL_FUNCTIONALITY")
+
+	if enableEmail {
+		log.Info("Email functionality is enabled, initializing MS Graph client")
+		// Initialize MS Graph email client
+		emailClient, err = msgraph.NewEmailClient()
+		if err != nil {
+			log.Error("Failed to initialize MS Graph email client", slog.Any("error", err))
+			// Continue without email functionality rather than failing the application
+			log.Warn("Email functionality will be disabled despite being enabled in configuration")
+		}
+	} else {
+		log.Info("Email functionality is disabled by feature toggle")
+	}
+
+	// Create a handler context with dependencies
+	handlerCtx := handlers.HandlerContext{
+		SlackClient:   slackClient,
+		EmailClient:   emailClient, // Will be nil if feature is disabled
+		UserGroupID:   slackUserGroupId,
+		WebhookSecret: webhookSecretKey,
+	}
+
+	// Set up HTTP routes
 	http.HandleFunc("/isready", handlers.HealthCheckHandler)
 	http.HandleFunc("/isalive", handlers.HealthCheckHandler)
 	http.HandleFunc("/memberEvent", func(w http.ResponseWriter, r *http.Request) {
-		handlers.NewMemberHandler(w, r, webhookSecretKey)
+		handlerCtx.NewMemberHandler(w, r)
 	})
 
+	// Start the server
+	log.Info("Server listening on port 8080")
 	if err := http.ListenAndServe(":8080", nil); err != nil {
-		log.Error("Failed to start server", "error", err)
-		panic(err)
+		log.Error("Failed to start server", slog.Any("error", err))
+		os.Exit(1)
 	}
+}
+
+// isFeatureEnabled checks if a feature toggle is enabled via environment variable
+// Returns true if the environment variable is set to "true", "yes", "1", or "on" (case insensitive)
+func isFeatureEnabled(envVarName string) bool {
+	value := strings.ToLower(os.Getenv(envVarName))
+	return value == "true" || value == "yes" || value == "1" || value == "on"
 }

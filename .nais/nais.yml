@@ -31,3 +31,8 @@ spec:
     - secret: appsec-github-watcher
   ingresses:
     - https://appsec-github-watcher.nav.no
+  env:
+    - name: EMAIL_FROM_ADDRESS
+      value: "appsec@nav.no"
+    - name: ENABLE_EMAIL_FUNCTIONALITY
+      value: "false"

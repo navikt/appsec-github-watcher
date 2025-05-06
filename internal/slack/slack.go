@@ -113,6 +113,7 @@ func getOAuthTokenWithEndpoint(endpoint string) (string, error) {
 	data := url.Values{}
 	data.Set("client_id", slackClientID)
 	data.Set("client_secret", slackClientSecret)
+	data.Set("grant_type", "client_credentials") // Add grant_type for client credentials flow
 
 	// Request a client credentials token using the provided endpoint
 	req, err := http.NewRequest("POST", endpoint, strings.NewReader(data.Encode()))

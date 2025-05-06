@@ -26,7 +26,7 @@ func TestIsFeatureEnabled(t *testing.T) {
 	}
 
 	const testEnvVar = "TEST_FEATURE_TOGGLE"
-	
+
 	// Save original env var to restore later
 	origValue := os.Getenv(testEnvVar)
 	defer os.Setenv(testEnvVar, origValue)
@@ -35,10 +35,10 @@ func TestIsFeatureEnabled(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Set environment variable for this test case
 			os.Setenv(testEnvVar, tc.envValue)
-			
+
 			// Test the feature toggle function
 			result := isFeatureEnabled(testEnvVar)
-			
+
 			if result != tc.expectEnabled {
 				t.Errorf("isFeatureEnabled(%q) = %v, want %v", tc.envValue, result, tc.expectEnabled)
 			}

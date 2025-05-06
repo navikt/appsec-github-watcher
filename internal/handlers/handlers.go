@@ -1,21 +1,35 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
 	"os"
 
+	"github.com/navikt/appsec-github-watcher/internal/github"
 	"github.com/navikt/appsec-github-watcher/internal/models"
+	"github.com/navikt/appsec-github-watcher/internal/msgraph"
+	"github.com/navikt/appsec-github-watcher/internal/slack"
 )
 
 var log = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-func NewMemberHandler(w http.ResponseWriter, r *http.Request, webhookSecretKey string) {
+// HandlerContext holds dependencies for the handlers
+type HandlerContext struct {
+	SlackClient   slack.SlackClient
+	EmailClient   msgraph.EmailClient
+	UserGroupID   string
+	WebhookSecret string
+}
+
+// NewMemberHandler processes GitHub member events
+func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 		log.Error("Invalid request method")
@@ -32,67 +46,141 @@ func NewMemberHandler(w http.ResponseWriter, r *http.Request, webhookSecretKey s
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, "Error reading request body", http.StatusInternalServerError)
-		log.Error("Error reading request body", slog.Any("err", err))
+		log.Error("Error reading request body", slog.Any("error", err))
 		return
 	}
 
-	if !validateHMAC(body, signature, webhookSecretKey) {
+	if !validateHMAC(body, signature, ctx.WebhookSecret) {
 		http.Error(w, "Invalid HMAC signature", http.StatusUnauthorized)
 		log.Error("Invalid HMAC signature")
 		return
 	}
 
 	// Unmarshal the JSON to ensure it's valid and to convert it to the appropriate struct
-	var m models.GitHubPayload
-	if err := json.Unmarshal(body, &m); err != nil {
+	var payload models.GitHubPayload
+	if err := json.Unmarshal(body, &payload); err != nil {
 		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
-		log.Error("Error decoding JSON", slog.Any("err", err))
+		log.Error("Error decoding JSON", slog.Any("error", err))
 		return
 	}
 
-	// Set the Event field from the X-GitHub-Event header
+	// Get the event type from the X-GitHub-Event header
 	event := r.Header.Get("X-GitHub-Event")
-	log.Info("Received GitHub event", slog.String("event", event))
+	log.Info("Received GitHub event",
+		slog.String("event", event),
+		slog.String("action", payload.Action))
 
-	if m.Action == "member_added" || m.Action == "member_removed" || m.Action == "deleted" {
-		log.Info("Received member event", slog.String("action", m.Action), slog.String("user", m.Membership.User.Login))
-		// Handle the member event by checking if action is one of member_added, member_removed, deleted.
-		// If the member event is added, check if it is an owner.
-		/*slackUser, err := slackClient.GetUserByEmail(m.Membership.User.Email)
+	// Process only relevant member events
+	if payload.Action == "member_added" || payload.Action == "member_removed" || payload.Action == "deleted" {
+		log.Info("Processing member event",
+			slog.String("action", payload.Action),
+			slog.String("user", payload.Membership.User.Login))
+
+		// Get the user's login and fetch SAML identity
+		userLogin := payload.Membership.User.Login
+		orgName := os.Getenv("GITHUB_ORGANIZATION")
+
+		// Create GitHub client and fetch the user's SAML email
+		githubClient, err := github.NewGraphQLClient(context.Background())
 		if err != nil {
-			http.Error(w, "Error fetching Slack user", http.StatusInternalServerError)
-			utils.logError("Error fetching Slack user", err)
+			log.Error("Failed to create GitHub client", slog.Any("error", err))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
-		}*/
-		if m.Membership.Role == "owner" {
-			log.Info("User is an owner, fetch all users in the slack usergroup")
-			// Fetch all users in the github-owners usergroup with usersgroups.users.list method
-			/*slackUserGroupMembers, err := slackClient.GetUserGroupMembers(os.Getenv("SLACK_USER_GROUP_ID"))
-			if err != nil {
-				http.Error(w, "Error fetching Slack user group", http.StatusInternalServerError)
-				utils.logError("Error fetching Slack user group", err)
-				return
-			}*/
-
-			if m.Action == "member_added" {
-				log.Info("Adding user to slackUserGroup")
-				// Check if slackUser is already in the slackUserGroup
-				// If so, do nothing else add the user to the slackUserGroup
-
-			}
-			if m.Action == "member_removed" || m.Action == "deleted" {
-				log.Info("Removing user from slackUserGroup")
-				// Remove the user from the slackUserGroup
-			}
-
 		}
 
-		// Else, if the user is a regular member, send a welcome email to the user.
-		if m.Action == "member_added" {
-			log.Info("Send welcome email to new user", slog.String("user", m.Membership.User.Login))
-			// Send welcome email to the user
+		samlEmail, err := github.FetchSAMLNameID(context.Background(), githubClient, orgName, userLogin)
+		if err != nil {
+			log.Error("Failed to fetch SAML nameID",
+				slog.String("user", userLogin),
+				slog.Any("error", err))
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		if samlEmail == "" {
+			log.Error("No SAML identity found for user", slog.String("user", userLogin))
+			http.Error(w, "User has no SAML identity", http.StatusBadRequest)
+			return
+		}
+
+		log.Info("Found SAML email for user",
+			slog.String("user", userLogin),
+			slog.String("email", samlEmail))
+
+		// Handle owners differently than regular members
+		if payload.Membership.Role == "owner" {
+			if payload.Action == "member_added" {
+				// Add the user to the Slack user group
+				log.Info("Adding user to Slack user group",
+					slog.String("email", samlEmail),
+					slog.String("userGroup", ctx.UserGroupID))
+
+				if err := ctx.SlackClient.AddUserToUserGroup(samlEmail, ctx.UserGroupID); err != nil {
+					log.Error("Failed to add user to Slack user group",
+						slog.String("email", samlEmail),
+						slog.Any("error", err))
+					http.Error(w, "Failed to update Slack user group", http.StatusInternalServerError)
+					return
+				}
+
+				log.Info("Successfully added user to Slack user group",
+					slog.String("email", samlEmail),
+					slog.String("userGroup", ctx.UserGroupID))
+			} else if payload.Action == "member_removed" || payload.Action == "deleted" {
+				// Remove the user from the Slack user group
+				log.Info("Removing user from Slack user group",
+					slog.String("email", samlEmail),
+					slog.String("userGroup", ctx.UserGroupID))
+
+				if err := ctx.SlackClient.RemoveUserFromUserGroup(samlEmail, ctx.UserGroupID); err != nil {
+					log.Error("Failed to remove user from Slack user group",
+						slog.String("email", samlEmail),
+						slog.Any("error", err))
+					http.Error(w, "Failed to update Slack user group", http.StatusInternalServerError)
+					return
+				}
+
+				log.Info("Successfully removed user from Slack user group",
+					slog.String("email", samlEmail),
+					slog.String("userGroup", ctx.UserGroupID))
+			}
+		} else if payload.Action == "member_added" {
+			// For regular members, send a welcome email with security guidelines
+			log.Info("Sending welcome email to new regular member",
+				slog.String("user", userLogin),
+				slog.String("email", samlEmail))
+
+			// Make sure we have an email client
+			if ctx.EmailClient == nil {
+				err := fmt.Errorf("email client is not initialized")
+				log.Error("Cannot send welcome email", slog.Any("error", err))
+				// Don't return an error to the webhook caller - just log the issue
+				// We don't want to fail the entire webhook because of email issues
+			} else {
+				if err := ctx.EmailClient.SendWelcomeEmail(samlEmail, userLogin); err != nil {
+					log.Error("Failed to send welcome email",
+						slog.String("email", samlEmail),
+						slog.String("user", userLogin),
+						slog.Any("error", err))
+					// Don't return an error to the webhook caller
+				} else {
+					log.Info("Successfully sent welcome email to new member",
+						slog.String("user", userLogin),
+						slog.String("email", samlEmail))
+				}
+			}
+		}
+	} else if payload.Action == "member_invited" {
+		// For invited members, we could potentially send an email to the invitation email
+		if payload.Invitation.Email != "" {
+			log.Info("User was invited, could send welcome email to invitation address",
+				slog.String("email", payload.Invitation.Email))
+
+			// We might choose to send a welcome email to the invitation address
+			// For now, we're just logging and not sending
 		}
 	}
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Message received"))
 }

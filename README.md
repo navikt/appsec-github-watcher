@@ -1,5 +1,16 @@
 # appsec-github-watcher
 
+## Description
+
+The appsec-github-watcher is a Go-based application that monitors GitHub organization membership changes through webhooks and automates security-related tasks. It provides the following key features:
+
+- **GitHub Organization Monitoring**: Listens to webhooks for member additions, removals, and invitations in a GitHub organization
+- **GitHub Owners Management**: Automatically adds organization owners to a dedicated Slack usergroup for improved communication and coordination
+- **User Onboarding**: Sends welcome emails to new organization members with security best practices and guidelines
+- **Security Compliance**: Helps maintain organizational security standards by ensuring all owners have proper Slack access and new members receive security guidance
+
+The application integrates with GitHub's API (including GraphQL for SSO email retrieval), Slack's API for usergroup management, and Microsoft Graph API for sending emails. It's designed to run as a standalone service or within a container.
+
 ## Environment variables required at runtime:
 
 ### General Configuration
@@ -58,3 +69,7 @@
 ## Testing
 
 Run tests with: `go test ./...`
+
+## Contact
+- Internal: Either our slack channel [#appsec](https://nav-it.slack.com/archives/C06P91VN27M) or contact a [team member](https://teamkatalogen.nav.no/team/02ed767d-ce01-49b5-9350-ee4c984fd78f) directly via slack/teams/mail.
+- External: [Open GitHub Issue](https://github.com/navikt/appsec-github-watcher/issues/new/choose)

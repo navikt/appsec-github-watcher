@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/navikt/appsec-github-watcher/internal/handlers"
 	"github.com/navikt/appsec-github-watcher/internal/msgraph"
@@ -31,18 +32,27 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize MS Graph email client
-	emailClient, err := msgraph.NewEmailClient()
-	if err != nil {
-		log.Error("Failed to initialize MS Graph email client", slog.Any("error", err))
-		// Continue without email functionality rather than failing the application
-		log.Warn("Email functionality will be disabled")
+	// Check feature toggle for email functionality
+	var emailClient msgraph.EmailClient
+	enableEmail := isFeatureEnabled("ENABLE_EMAIL_FUNCTIONALITY")
+
+	if enableEmail {
+		log.Info("Email functionality is enabled, initializing MS Graph client")
+		// Initialize MS Graph email client
+		emailClient, err = msgraph.NewEmailClient()
+		if err != nil {
+			log.Error("Failed to initialize MS Graph email client", slog.Any("error", err))
+			// Continue without email functionality rather than failing the application
+			log.Warn("Email functionality will be disabled despite being enabled in configuration")
+		}
+	} else {
+		log.Info("Email functionality is disabled by feature toggle")
 	}
 
 	// Create a handler context with dependencies
 	handlerCtx := handlers.HandlerContext{
 		SlackClient:   slackClient,
-		EmailClient:   emailClient,
+		EmailClient:   emailClient, // Will be nil if feature is disabled
 		UserGroupID:   slackUserGroupId,
 		WebhookSecret: webhookSecretKey,
 	}
@@ -60,4 +70,11 @@ func main() {
 		log.Error("Failed to start server", slog.Any("error", err))
 		os.Exit(1)
 	}
+}
+
+// isFeatureEnabled checks if a feature toggle is enabled via environment variable
+// Returns true if the environment variable is set to "true", "yes", "1", or "on" (case insensitive)
+func isFeatureEnabled(envVarName string) bool {
+	value := strings.ToLower(os.Getenv(envVarName))
+	return value == "true" || value == "yes" || value == "1" || value == "on"
 }

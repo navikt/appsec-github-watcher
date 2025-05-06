@@ -2,6 +2,9 @@
 
 ## Environment variables required at runtime:
 
+### General Configuration
+- `ENABLE_EMAIL_FUNCTIONALITY` - Feature toggle for email functionality. Set to "true", "yes", "1", or "on" to enable welcome emails (optional, default: disabled)
+
 ### GitHub Application
 - `GITHUB_WEBHOOK_SECRET_KEY` Generated secret we use to verify that the payload is sent from our webhook.
 - `GITHUB_APP_ID` The GitHub App ID used for authentication.
@@ -39,7 +42,7 @@
 - `AZURE_APP_TENANT_ID` - Azure AD tenant ID
 - `AZURE_APP_CLIENT_SECRET` - Azure AD client secret
 - `AZURE_OPENID_CONFIG_TOKEN_ENDPOINT` - Azure AD token endpoint (optional, defaults to standard endpoint)
-- `EMAIL_FROM_ADDRESS` - The email address to send welcome emails from (optional, defaults to noreply@nav.no)
+- `EMAIL_FROM_ADDRESS` - The email address to send welcome emails from (optional, defaults to appsec@nav.no)
 
 #### Required Microsoft Graph API Permissions
 - `Mail.Send` - To send welcome emails

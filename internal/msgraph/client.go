@@ -70,7 +70,7 @@ func NewEmailClient() (EmailClient, error) {
 
 	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
 	if fromEmail == "" {
-		fromEmail = "noreply@nav.no" // Default sender address
+		fromEmail = "appsec@nav.no" // Default sender address
 		log.Info("Using default sender email address", slog.String("email", fromEmail))
 	}
 

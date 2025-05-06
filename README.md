@@ -27,9 +27,9 @@
 - `organization.member_invited`
 
 ### Slack Integration
-- `SLACK_APP_CLIENT_ID` The Slack application client ID for OAuth.
-- `SLACK_APP_SECRET` The Slack application client secret for OAuth.
-- `SLACK_REFRESH_TOKEN` The refresh token used for Slack API OAuth flow.
+- `SLACK_APP_CLIENT_ID` The Slack application client ID
+- `SLACK_APP_CLIENT_SECRET` The Slack application client secret
+- `SLACK_APP_SIGNING_SECRET` The Slack signing secret used to verify responses from Slack API
 
 #### Required Slack Scopes
 - `usergroups:read` - To read the list of users in a user group

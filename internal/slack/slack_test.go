@@ -1,7 +1,11 @@
 package slack
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -10,6 +14,35 @@ import (
 
 	"github.com/slack-go/slack"
 )
+
+// Mock OAuth token endpoint handler
+func createMockOAuthServer(t *testing.T, wantSuccess bool) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/oauth.v2.access" {
+			// Set headers to simulate Slack's response, including signature headers
+			w.Header().Set("X-Slack-Signature", "v0=mock-signature")
+			w.Header().Set("X-Slack-Request-Timestamp", "1234567890")
+
+			if !wantSuccess {
+				json.NewEncoder(w).Encode(map[string]interface{}{
+					"ok":    false,
+					"error": "invalid_client_secret",
+				})
+				return
+			}
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":           true,
+				"access_token": "xoxb-mock-token-12345",
+				"token_type":   "bot",
+			})
+		} else {
+			// Handle unexpected requests
+			t.Logf("Unhandled request to mock oauth server: %s", r.URL.String())
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
 
 func TestAddUserToUserGroup(t *testing.T) {
 	// simulate Slack server
@@ -222,41 +255,158 @@ func TestRemoveUserFromUserGroup_NotFound(t *testing.T) {
 func TestGetOAuthToken(t *testing.T) {
 	// Save original env vars to restore later
 	origClientID := os.Getenv("SLACK_APP_CLIENT_ID")
-	origClientSecret := os.Getenv("SLACK_APP_SECRET")
-	origRefreshToken := os.Getenv("SLACK_REFRESH_TOKEN")
+	origClientSecret := os.Getenv("SLACK_APP_CLIENT_SECRET")
+	origSigningSecret := os.Getenv("SLACK_APP_SIGNING_SECRET")
 
 	// Restore env vars after test
 	defer func() {
 		os.Setenv("SLACK_APP_CLIENT_ID", origClientID)
-		os.Setenv("SLACK_APP_SECRET", origClientSecret)
-		os.Setenv("SLACK_REFRESH_TOKEN", origRefreshToken)
+		os.Setenv("SLACK_APP_CLIENT_SECRET", origClientSecret)
+		os.Setenv("SLACK_APP_SIGNING_SECRET", origSigningSecret)
+		// Reset the mock endpoint after tests
+		mockOAuthEndpoint = ""
 	}()
 
-	t.Run("returns error when client ID missing", func(t *testing.T) {
+	t.Run("returns error when client ID or secret missing", func(t *testing.T) {
 		os.Setenv("SLACK_APP_CLIENT_ID", "")
-		os.Setenv("SLACK_APP_SECRET", "")
-		os.Setenv("SLACK_REFRESH_TOKEN", "")
+		os.Setenv("SLACK_APP_CLIENT_SECRET", "")
+		os.Setenv("SLACK_APP_SIGNING_SECRET", "")
 
-		_, err := GetOAuthToken()
+		_, err := getOAuthToken()
 		if err == nil {
 			t.Fatal("expected error when credentials missing")
 		}
-	})
-
-	t.Run("returns error when refresh token missing", func(t *testing.T) {
-		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
-		os.Setenv("SLACK_APP_SECRET", "test-client-secret")
-		os.Setenv("SLACK_REFRESH_TOKEN", "")
-
-		_, err := GetOAuthToken()
-		if err == nil {
-			t.Fatal("expected error when refresh token missing")
-		}
-		if err.Error() != "missing required environment variable: SLACK_REFRESH_TOKEN" {
+		if !strings.Contains(err.Error(), "missing required environment variables") {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
 
-	// Note: Testing the actual refresh token flow requires mocking the OAuth2 token endpoint
-	// This would typically be done in an integration test or with a more complex test setup
+	t.Run("handles successful token response", func(t *testing.T) {
+		// Create a mock server for the OAuth endpoint
+		mockServer := createMockOAuthServer(t, true)
+		defer mockServer.Close()
+
+		// Set the mock endpoint via the package variable
+		mockOAuthEndpoint = mockServer.URL + "/oauth.v2.access"
+
+		// Set test environment variables
+		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
+		os.Setenv("SLACK_APP_CLIENT_SECRET", "test-client-secret")
+		os.Setenv("SLACK_APP_SIGNING_SECRET", "test-signing-secret")
+
+		// Call the function
+		token, err := getOAuthToken()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if token != "xoxb-mock-token-12345" {
+			t.Errorf("expected mock token, got: %s", token)
+		}
+	})
+
+	t.Run("handles error response from Slack", func(t *testing.T) {
+		// Create a mock server that returns an error
+		mockServer := createMockOAuthServer(t, false)
+		defer mockServer.Close()
+
+		// Set the mock endpoint via the package variable
+		mockOAuthEndpoint = mockServer.URL + "/oauth.v2.access"
+
+		// Set test environment variables
+		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
+		os.Setenv("SLACK_APP_CLIENT_SECRET", "invalid-secret")
+		os.Setenv("SLACK_APP_SIGNING_SECRET", "test-signing-secret")
+
+		// Call the function
+		_, err := getOAuthToken()
+		if err == nil {
+			t.Fatal("expected error when Slack returns error response")
+		}
+		if !strings.Contains(err.Error(), "slack oauth error") {
+			t.Errorf("unexpected error message: %v", err)
+		}
+	})
+
+	t.Run("skips signature verification when signing secret not provided", func(t *testing.T) {
+		// Create a mock server for the OAuth endpoint
+		mockServer := createMockOAuthServer(t, true)
+		defer mockServer.Close()
+
+		// Set the mock endpoint via the package variable
+		mockOAuthEndpoint = mockServer.URL + "/oauth.v2.access"
+
+		// Set test environment variables (without signing secret)
+		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
+		os.Setenv("SLACK_APP_CLIENT_SECRET", "test-client-secret")
+		os.Setenv("SLACK_APP_SIGNING_SECRET", "")
+
+		// Call the function - should still work without signing verification
+		token, err := getOAuthToken()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if token != "xoxb-mock-token-12345" {
+			t.Errorf("expected mock token, got: %s", token)
+		}
+	})
+}
+
+func TestVerifySlackSignature(t *testing.T) {
+	// Test case with valid signature
+	t.Run("valid signature", func(t *testing.T) {
+		// Generate a valid signature for testing
+		body := "test-body"
+		timestamp := "1234567890"
+		secret := "test-secret"
+
+		// Create the base string like the verification method does
+		baseString := fmt.Sprintf("v0:%s:%s", timestamp, body)
+
+		// Calculate the HMAC-SHA256 signature
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(baseString))
+		expectedSignature := fmt.Sprintf("v0=%s", hex.EncodeToString(mac.Sum(nil)))
+
+		// Verify the signature
+		result := verifySlackSignature(expectedSignature, timestamp, body, secret)
+		if !result {
+			t.Error("Expected signature to be valid, but verification failed")
+		}
+	})
+
+	// Test case with invalid signature
+	t.Run("invalid signature", func(t *testing.T) {
+		body := "test-body"
+		timestamp := "1234567890"
+		signature := "v0=invalid-signature"
+		secret := "test-secret"
+
+		result := verifySlackSignature(signature, timestamp, body, secret)
+		if result {
+			t.Error("Expected signature to be invalid, but verification passed")
+		}
+	})
+
+	// Test case with tampered body
+	t.Run("tampered body", func(t *testing.T) {
+		// First generate a valid signature for "test-body"
+		originalBody := "test-body"
+		tamperedBody := "tampered-body"
+		timestamp := "1234567890"
+		secret := "test-secret"
+
+		// Create the base string for the original body
+		baseString := fmt.Sprintf("v0:%s:%s", timestamp, originalBody)
+
+		// Calculate the signature for the original body
+		mac := hmac.New(sha256.New, []byte(secret))
+		mac.Write([]byte(baseString))
+		signature := fmt.Sprintf("v0=%s", hex.EncodeToString(mac.Sum(nil)))
+
+		// Verify using the tampered body
+		result := verifySlackSignature(signature, timestamp, tamperedBody, secret)
+		if result {
+			t.Error("Expected signature to be invalid for tampered body, but verification passed")
+		}
+	})
 }

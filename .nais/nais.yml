@@ -17,15 +17,15 @@ spec:
     cpuThresholdPercentage: 90
   resources:
     limits:
-      memory: "64Mi"
+      memory: "32Mi"
     requests:
       cpu: "10m"
-      memory: "32Mi"
+      memory: "16Mi"
   liveness:
-    initialDelay: 30
+    initialDelay: 10
     path: isalive
   readiness:
-    initialDelay: 30
+    initialDelay: 10
     path: isready
   envFrom:
     - secret: appsec-github-watcher

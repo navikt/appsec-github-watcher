@@ -15,35 +15,6 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// Mock OAuth token endpoint handler
-func createMockOAuthServer(t *testing.T, wantSuccess bool) *httptest.Server {
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/oauth.v2.access" {
-			// Set headers to simulate Slack's response, including signature headers
-			w.Header().Set("X-Slack-Signature", "v0=mock-signature")
-			w.Header().Set("X-Slack-Request-Timestamp", "1234567890")
-
-			if !wantSuccess {
-				json.NewEncoder(w).Encode(map[string]interface{}{
-					"ok":    false,
-					"error": "invalid_client_secret",
-				})
-				return
-			}
-
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"ok":           true,
-				"access_token": "xoxb-mock-token-12345",
-				"token_type":   "bot",
-			})
-		} else {
-			// Handle unexpected requests
-			t.Logf("Unhandled request to mock oauth server: %s", r.URL.String())
-			w.WriteHeader(http.StatusNotFound)
-		}
-	}))
-}
-
 func TestAddUserToUserGroup(t *testing.T) {
 	// simulate Slack server
 	var (

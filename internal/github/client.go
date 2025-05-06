@@ -13,25 +13,20 @@ import (
 
 // NewGraphQLClient creates a GitHub-v4 client authenticated as your App installation.
 func NewGraphQLClient(ctx context.Context) (*githubv4.Client, error) {
-	appID := os.Getenv("GITHUB_APP_ID")
 	installationID := os.Getenv("GITHUB_INSTALLATION_ID")
 
 	// load private key from env
 	privateKeyPEM := os.Getenv("GITHUB_APP_PRIVATE_KEY")
 	privateKey := []byte(privateKeyPEM)
 
-	// parse app and installation IDs
-	appIDInt, err := strconv.ParseInt(appID, 10, 64)
-	if err != nil {
-		return nil, err
-	}
+	// parse installation IDs
 	installationIDInt, err := strconv.ParseInt(installationID, 10, 64)
 	if err != nil {
 		return nil, err
 	}
 	// build transport that handles App JWT + installation token
 	tr := http.DefaultTransport
-	appsTransport, err := ghinstallation.NewAppsTransport(tr, appIDInt, privateKey)
+	appsTransport, err := ghinstallation.NewAppsTransport(tr, installationIDInt, privateKey)
 	if err != nil {
 		return nil, err
 	}

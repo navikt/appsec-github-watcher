@@ -38,9 +38,7 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 - `organization.member_invited`
 
 ### Slack Integration
-- `SLACK_APP_CLIENT_ID` The Slack application client ID
-- `SLACK_APP_CLIENT_SECRET` The Slack application client secret
-- `SLACK_APP_SIGNING_SECRET` The Slack signing secret used to verify responses from Slack API
+- `SLACK_BOT_TOKEN` The Bot User OAuth Token for the Slack application. You can obtain this from your Slack App settings under "OAuth & Permissions" > "Bot User OAuth Token".
 
 #### Required Slack Scopes
 - `usergroups:read` - To read the list of users in a user group

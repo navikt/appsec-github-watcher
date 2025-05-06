@@ -4,14 +4,10 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/slack-go/slack"
@@ -97,78 +93,16 @@ func NewSlackClient() (SlackClient, error) {
 
 // getOAuthTokenWithEndpoint is a test-friendly version that allows specifying the endpoint
 func getOAuthTokenWithEndpoint(endpoint string) (string, error) {
-	slackClientID := os.Getenv("SLACK_APP_CLIENT_ID")
-	slackClientSecret := os.Getenv("SLACK_APP_CLIENT_SECRET")
-	slackSigningSecret := os.Getenv("SLACK_APP_SIGNING_SECRET")
+	slackBotToken := os.Getenv("SLACK_BOT_TOKEN")
 
-	if slackClientID == "" || slackClientSecret == "" {
-		return "", fmt.Errorf("missing required environment variables: SLACK_APP_CLIENT_ID or SLACK_APP_CLIENT_SECRET")
+	// Check if we have a direct bot token
+	if slackBotToken != "" {
+		log.Info("Using provided SLACK_BOT_TOKEN")
+		return slackBotToken, nil
 	}
 
-	if slackSigningSecret == "" {
-		log.Warn("SLACK_APP_SIGNING_SECRET environment variable is not set. Response verification will be skipped.")
-	}
-
-	// Create form data for token request
-	data := url.Values{}
-	data.Set("client_id", slackClientID)
-	data.Set("client_secret", slackClientSecret)
-	data.Set("grant_type", "client_credentials") // Add grant_type for client credentials flow
-
-	// Request a client credentials token using the provided endpoint
-	req, err := http.NewRequest("POST", endpoint, strings.NewReader(data.Encode()))
-	if err != nil {
-		return "", fmt.Errorf("failed to create token request: %w", err)
-	}
-
-	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
-
-	// Send the request
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute token request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the response
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read token response: %w", err)
-	}
-
-	// Verify the response signature if signing secret is provided
-	// Note: In a production environment, we would verify the signature, but for
-	// our HTTP client tests, we're skipping this step if we're using a mock OAuth endpoint
-	if slackSigningSecret != "" && !strings.Contains(endpoint, "localhost") && !strings.Contains(endpoint, "127.0.0.1") && mockOAuthEndpoint == "" {
-		signature := resp.Header.Get("X-Slack-Signature")
-		timestamp := resp.Header.Get("X-Slack-Request-Timestamp")
-
-		if signature != "" && timestamp != "" {
-			// Verify the signature
-			if !verifySlackSignature(signature, timestamp, string(body), slackSigningSecret) {
-				return "", fmt.Errorf("slack response signature verification failed")
-			}
-			log.Info("Slack response signature verified successfully")
-		} else {
-			log.Warn("Slack response does not contain signature headers, skipping verification")
-		}
-	} else if mockOAuthEndpoint != "" {
-		log.Info("Using mock OAuth endpoint, skipping signature verification")
-	}
-
-	// Parse the JSON response
-	var tokenResponse SlackTokenResponse
-	if err := json.Unmarshal(body, &tokenResponse); err != nil {
-		return "", fmt.Errorf("failed to parse token response: %w", err)
-	}
-
-	// Check if the response was successful
-	if !tokenResponse.OK {
-		return "", fmt.Errorf("slack oauth error: %s", tokenResponse.Error)
-	}
-
-	return tokenResponse.AccessToken, nil
+	// No bot token available
+	return "", fmt.Errorf("missing required environment variable: SLACK_BOT_TOKEN")
 }
 
 // getOAuthToken retrieves a token using client credentials and verifies the response

@@ -26,3 +26,4 @@ We follow the server project module layout from go.dev: Server projects typicall
 6. We use OIDC/Oauth2 in all external calls. Required environment variables will be described in the README.
 7. We use supplied Azure environment variables to send email using the microsoft graph api.
 8. As much as possible we use the go standard library. If we need to use a third party library, make sure it is well maintained and has a good reputation.
+9. We will use the go embed package to include email templates directly in the compiled binary.

@@ -254,99 +254,38 @@ func TestRemoveUserFromUserGroup_NotFound(t *testing.T) {
 
 func TestGetOAuthToken(t *testing.T) {
 	// Save original env vars to restore later
-	origClientID := os.Getenv("SLACK_APP_CLIENT_ID")
-	origClientSecret := os.Getenv("SLACK_APP_CLIENT_SECRET")
-	origSigningSecret := os.Getenv("SLACK_APP_SIGNING_SECRET")
+	origBotToken := os.Getenv("SLACK_BOT_TOKEN")
 
 	// Restore env vars after test
 	defer func() {
-		os.Setenv("SLACK_APP_CLIENT_ID", origClientID)
-		os.Setenv("SLACK_APP_CLIENT_SECRET", origClientSecret)
-		os.Setenv("SLACK_APP_SIGNING_SECRET", origSigningSecret)
+		os.Setenv("SLACK_BOT_TOKEN", origBotToken)
 		// Reset the mock endpoint after tests
 		mockOAuthEndpoint = ""
 	}()
 
-	t.Run("returns error when client ID or secret missing", func(t *testing.T) {
-		os.Setenv("SLACK_APP_CLIENT_ID", "")
-		os.Setenv("SLACK_APP_CLIENT_SECRET", "")
-		os.Setenv("SLACK_APP_SIGNING_SECRET", "")
+	t.Run("returns error when bot token is missing", func(t *testing.T) {
+		os.Setenv("SLACK_BOT_TOKEN", "")
 
 		_, err := getOAuthToken()
 		if err == nil {
-			t.Fatal("expected error when credentials missing")
+			t.Fatal("expected error when bot token is missing")
 		}
-		if !strings.Contains(err.Error(), "missing required environment variables") {
+		if !strings.Contains(err.Error(), "missing required environment variable: SLACK_BOT_TOKEN") {
 			t.Errorf("unexpected error message: %v", err)
 		}
 	})
 
-	t.Run("handles successful token response", func(t *testing.T) {
-		// Create a mock server for the OAuth endpoint
-		mockServer := createMockOAuthServer(t, true)
-		defer mockServer.Close()
-
-		// Set the mock endpoint via the package variable
-		mockOAuthEndpoint = mockServer.URL + "/oauth.v2.access"
-
+	t.Run("returns bot token when provided", func(t *testing.T) {
 		// Set test environment variables
-		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
-		os.Setenv("SLACK_APP_CLIENT_SECRET", "test-client-secret")
-		os.Setenv("SLACK_APP_SIGNING_SECRET", "test-signing-secret")
+		os.Setenv("SLACK_BOT_TOKEN", "xoxb-test-bot-token")
 
 		// Call the function
 		token, err := getOAuthToken()
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if token != "xoxb-mock-token-12345" {
-			t.Errorf("expected mock token, got: %s", token)
-		}
-	})
-
-	t.Run("handles error response from Slack", func(t *testing.T) {
-		// Create a mock server that returns an error
-		mockServer := createMockOAuthServer(t, false)
-		defer mockServer.Close()
-
-		// Set the mock endpoint via the package variable
-		mockOAuthEndpoint = mockServer.URL + "/oauth.v2.access"
-
-		// Set test environment variables
-		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
-		os.Setenv("SLACK_APP_CLIENT_SECRET", "invalid-secret")
-		os.Setenv("SLACK_APP_SIGNING_SECRET", "test-signing-secret")
-
-		// Call the function
-		_, err := getOAuthToken()
-		if err == nil {
-			t.Fatal("expected error when Slack returns error response")
-		}
-		if !strings.Contains(err.Error(), "slack oauth error") {
-			t.Errorf("unexpected error message: %v", err)
-		}
-	})
-
-	t.Run("skips signature verification when signing secret not provided", func(t *testing.T) {
-		// Create a mock server for the OAuth endpoint
-		mockServer := createMockOAuthServer(t, true)
-		defer mockServer.Close()
-
-		// Set the mock endpoint via the package variable
-		mockOAuthEndpoint = mockServer.URL + "/oauth.v2.access"
-
-		// Set test environment variables (without signing secret)
-		os.Setenv("SLACK_APP_CLIENT_ID", "test-client-id")
-		os.Setenv("SLACK_APP_CLIENT_SECRET", "test-client-secret")
-		os.Setenv("SLACK_APP_SIGNING_SECRET", "")
-
-		// Call the function - should still work without signing verification
-		token, err := getOAuthToken()
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if token != "xoxb-mock-token-12345" {
-			t.Errorf("expected mock token, got: %s", token)
+		if token != "xoxb-test-bot-token" {
+			t.Errorf("expected bot token, got: %s", token)
 		}
 	})
 }

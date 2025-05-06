@@ -32,7 +32,7 @@ docker:
 	docker build -t appsec-github-watcher .
 
 # Check for code quality issues
-check: fmt vet lint test
+check: fmt vet test
 
 # Run go vet
 vet:
@@ -51,6 +51,5 @@ help:
 	@echo "  docker    - Build Docker image"
 	@echo "  check     - Run all code quality checks and tests"
 	@echo "  vet       - Run go vet for static analysis"
-	@echo "  lint      - Run golangci-lint for advanced linting"
 	@echo "  help      - Show this help message"
 

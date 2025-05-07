@@ -28,6 +28,6 @@ spec:
         - id: loki
   env:
     - name: SLACK_USER_GROUP_ID
-      value: "S0604QSJC"
+      value: "SK4LXFHHV"
     - name: GITHUB_ORGANIZATION
       value: "navikt"

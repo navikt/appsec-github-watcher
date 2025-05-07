@@ -27,7 +27,7 @@ spec:
       destinations:
         - id: loki
   env:
-    - name: SLACK_USERGROUP_ID
+    - name: SLACK_USER_GROUP_ID
       value: "S0604QSJC"
     - name: GITHUB_ORGANIZATION
       value: "navikt"

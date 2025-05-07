@@ -35,7 +35,6 @@ spec:
     outbound:
       external:
         - host: api.github.com
-        - host: slack.com
   env:
     - name: EMAIL_FROM_ADDRESS
       value: "ikkesvar.appsec@nav.no"

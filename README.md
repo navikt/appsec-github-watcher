@@ -33,14 +33,10 @@ Both applications integrate with GitHub's API (including GraphQL for SSO email r
 - `GITHUB_APP_PRIVATE_KEY` The private key used for GitHub App authentication.
 - `GITHUB_ORGANIZATION` The GitHub organization name to fetch SAML identity information.
 
-#### Required GitHub Permissions
+#### Required GitHub App Permissions
 - **Organization**:
   - `members`: `read` - To receive webhooks for membership changes and list admins
   - `administration`: `read` - To access organization information
-- **Repository**:
-  - `metadata`: `read` - Basic repository access
-- **Account**:
-  - `email`: `read` - To read user email information
 
 #### Webhook Events
 - `organization.member_added`

@@ -8,8 +8,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
+	"github.com/navikt/appsec-github-watcher/internal/models"
 	"github.com/slack-go/slack"
 )
 
@@ -28,14 +30,23 @@ var log = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 type SlackClient interface {
 	AddUserToUserGroup(userEmail string, userGroupID string) error
 	RemoveUserFromUserGroup(userEmail string, userGroupID string) error
+	GetUsergroupMembers(usergroupID string) (*models.SlackGroupUsers, error)
+	GetUserIDsByEmails(emails []string) ([]string, []string, error)
+	UpdateUsergroupMembers(usergroupID string, userIDs []string) error
 }
 
 // MockSlackClient implements the SlackClient interface for testing
 type MockSlackClient struct {
-	AddUserError    error
-	RemoveUserError error
-	AddedEmails     []string
-	RemovedEmails   []string
+	AddUserError                error
+	RemoveUserError             error
+	GetUsergroupMembersError    error
+	GetUserIDsByEmailsError     error
+	UpdateUsergroupMembersError error
+	AddedEmails                 []string
+	RemovedEmails               []string
+	MockUsers                   *models.SlackGroupUsers
+	MockUserIDs                 []string
+	MockNotFoundEmails          []string
 }
 
 func (m *MockSlackClient) AddUserToUserGroup(userEmail string, userGroupID string) error {
@@ -51,6 +62,49 @@ func (m *MockSlackClient) RemoveUserFromUserGroup(userEmail string, userGroupID 
 		return m.RemoveUserError
 	}
 	m.RemovedEmails = append(m.RemovedEmails, userEmail)
+	return nil
+}
+
+func (m *MockSlackClient) GetUsergroupMembers(usergroupID string) (*models.SlackGroupUsers, error) {
+	if m.GetUsergroupMembersError != nil {
+		return nil, m.GetUsergroupMembersError
+	}
+
+	if m.MockUsers == nil {
+		return &models.SlackGroupUsers{Users: []string{}}, nil
+	}
+
+	return m.MockUsers, nil
+}
+
+func (m *MockSlackClient) GetUserIDsByEmails(emails []string) ([]string, []string, error) {
+	if m.GetUserIDsByEmailsError != nil {
+		return nil, nil, m.GetUserIDsByEmailsError
+	}
+
+	if m.MockUserIDs == nil {
+		// Return dummy user IDs that match the input emails (for simple testing)
+		ids := make([]string, len(emails))
+		for i, email := range emails {
+			ids[i] = "U" + strings.Replace(email, "@", "_", -1)
+		}
+		return ids, m.MockNotFoundEmails, nil
+	}
+
+	return m.MockUserIDs, m.MockNotFoundEmails, nil
+}
+
+func (m *MockSlackClient) UpdateUsergroupMembers(usergroupID string, userIDs []string) error {
+	if m.UpdateUsergroupMembersError != nil {
+		return m.UpdateUsergroupMembersError
+	}
+
+	// Store the updated userIDs for testing
+	if m.MockUsers == nil {
+		m.MockUsers = &models.SlackGroupUsers{}
+	}
+	m.MockUsers.Users = userIDs
+
 	return nil
 }
 
@@ -330,5 +384,144 @@ func (s *slackClient) RemoveUserFromUserGroup(userEmail string, userGroupID stri
 		slog.String("email", userEmail),
 		slog.String("userID", userID),
 		slog.String("userGroupID", userGroupID))
+	return nil
+}
+
+// GetUsergroupMembers gets all members of a Slack user group
+func (s *slackClient) GetUsergroupMembers(usergroupID string) (*models.SlackGroupUsers, error) {
+	var members []string
+
+	log.Info("Fetching members of Slack user group", slog.String("usergroupID", usergroupID))
+
+	err := s.doWithRetry(func() error {
+		var err error
+		members, err = s.api.GetUserGroupMembers(usergroupID)
+		if err != nil {
+			return fmt.Errorf("failed to get user group members: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error("Failed to fetch user group members",
+			slog.String("usergroupID", usergroupID),
+			slog.Any("error", err))
+		return nil, err
+	}
+
+	log.Info("Successfully fetched user group members",
+		slog.String("usergroupID", usergroupID),
+		slog.Int("memberCount", len(members)))
+
+	return &models.SlackGroupUsers{Users: members}, nil
+}
+
+// For test use - allows replacing the default user lookup function
+type userLookupFunc func(email string) (*slack.User, error)
+
+// GetUserIDsByEmailsWithLookup allows custom user lookup for testing
+func (s *slackClient) GetUserIDsByEmailsWithLookup(emails []string, lookupFn userLookupFunc) ([]string, []string, error) {
+	userIDs := make([]string, 0, len(emails))
+	notFound := make([]string, 0)
+
+	log.Info("Converting emails to Slack user IDs", slog.Int("emailCount", len(emails)))
+
+	for _, email := range emails {
+		user, err := lookupFn(email)
+
+		if err != nil {
+			// Check if this is a user not found error
+			if strings.Contains(err.Error(), "users_not_found") ||
+				strings.Contains(err.Error(), "user_not_found") {
+				log.Warn("User not found in Slack", slog.String("email", email))
+				notFound = append(notFound, email)
+				continue
+			}
+
+			// Any other error
+			log.Error("Error fetching user by email",
+				slog.String("email", email),
+				slog.Any("error", err))
+			continue
+		}
+
+		if user != nil {
+			userIDs = append(userIDs, user.ID)
+			log.Debug("Mapped email to Slack user ID",
+				slog.String("email", email),
+				slog.String("userID", user.ID))
+		} else {
+			log.Warn("User lookup returned nil for", slog.String("email", email))
+			notFound = append(notFound, email)
+		}
+	}
+
+	log.Info("Completed mapping emails to Slack user IDs",
+		slog.Int("totalEmails", len(emails)),
+		slog.Int("foundUsers", len(userIDs)),
+		slog.Int("notFoundUsers", len(notFound)))
+
+	return userIDs, notFound, nil
+}
+
+// GetUserIDsByEmails converts a list of email addresses to Slack user IDs
+func (s *slackClient) GetUserIDsByEmails(emails []string) ([]string, []string, error) {
+	return s.GetUserIDsByEmailsWithLookup(emails, func(email string) (*slack.User, error) {
+		var user *slack.User
+		var err error
+
+		err = s.doWithRetry(func() error {
+			user, err = s.api.GetUserByEmail(email)
+			if err != nil {
+				// Check if it's a "user_not_found" error from Slack
+				if strings.Contains(err.Error(), "users_not_found") ||
+					strings.Contains(err.Error(), "user_not_found") {
+					return nil // Not a retry-able error, but we'll handle it in the outer function
+				}
+				return fmt.Errorf("failed to get user by email: %w", err)
+			}
+			return nil
+		})
+
+		return user, err
+	})
+}
+
+// UpdateUsergroupMembers updates a Slack user group with a new list of members
+func (s *slackClient) UpdateUsergroupMembers(usergroupID string, userIDs []string) error {
+	if len(userIDs) == 0 {
+		log.Warn("Attempted to update user group with empty user list",
+			slog.String("usergroupID", usergroupID))
+		return fmt.Errorf("cannot update user group with empty user list")
+	}
+
+	log.Info("Updating Slack user group members",
+		slog.String("usergroupID", usergroupID),
+		slog.Int("userCount", len(userIDs)))
+
+	// Convert the user IDs to a comma-separated string
+	userIDsStr := strings.Join(userIDs, ",")
+
+	// Send update to Slack API with retry
+	err := s.doWithRetry(func() error {
+		_, err := s.api.UpdateUserGroupMembers(usergroupID, userIDsStr)
+		if err != nil {
+			return fmt.Errorf("failed to update user group members: %w", err)
+		}
+		return nil
+	})
+
+	if err != nil {
+		log.Error("Failed to update user group members",
+			slog.String("usergroupID", usergroupID),
+			slog.Int("userCount", len(userIDs)),
+			slog.Any("error", err))
+		return err
+	}
+
+	log.Info("Successfully updated user group members",
+		slog.String("usergroupID", usergroupID),
+		slog.Int("userCount", len(userIDs)))
+
 	return nil
 }

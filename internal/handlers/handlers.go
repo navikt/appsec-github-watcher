@@ -15,17 +15,47 @@ import (
 	"github.com/navikt/appsec-github-watcher/internal/github"
 	"github.com/navikt/appsec-github-watcher/internal/models"
 	"github.com/navikt/appsec-github-watcher/internal/msgraph"
-	"github.com/navikt/appsec-github-watcher/internal/slack"
 )
 
 var log = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 // HandlerContext holds dependencies for the handlers
 type HandlerContext struct {
-	SlackClient   slack.SlackClient
 	EmailClient   msgraph.EmailClient
-	UserGroupID   string
 	WebhookSecret string
+}
+
+func (ctx *HandlerContext) EmailEventHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		log.Error("Invalid request method")
+		return
+	}
+
+	// Read the request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "Error reading request body", http.StatusInternalServerError)
+		log.Error("Error reading request body", slog.Any("error", err))
+		return
+	}
+
+	emailDebugKey := os.Getenv("EMAIL_DEBUG_KEY")
+	emailDebugAddress := os.Getenv("EMAIL_DEBUG_ADDRESS")
+	// Check if body contains emailDebugKey
+	if emailDebugKey != "" && string(body) == emailDebugKey {
+		log.Info("Email debug key found in request body, skipping email processing")
+		w.WriteHeader(http.StatusNotFound)
+		err = ctx.EmailClient.SendWelcomeEmail(emailDebugAddress, "debug")
+		if err != nil {
+			log.Error("Failed to send welcome email", slog.Any("error", err))
+		}
+	}
+
+	// Log the email event
+	log.Info("Received email event", slog.String("body", string(body)))
+
+	w.WriteHeader(http.StatusForbidden)
 }
 
 // NewMemberHandler processes GitHub member events
@@ -71,7 +101,7 @@ func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Reque
 		slog.String("action", payload.Action))
 
 	// Process only relevant member events
-	if payload.Action == "member_added" || payload.Action == "member_removed" || payload.Action == "deleted" {
+	if payload.Action == "member_added" {
 		log.Info("Processing member event",
 			slog.String("action", payload.Action),
 			slog.String("user", payload.Membership.User.Login))
@@ -107,78 +137,31 @@ func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Reque
 			slog.String("user", userLogin),
 			slog.String("email", samlEmail))
 
-		// Handle owners differently than regular members
-		if payload.Membership.Role == "owner" {
-			if payload.Action == "member_added" {
-				// Add the user to the Slack user group
-				log.Info("Adding user to Slack user group",
+		// Send a welcome email with security guidelines
+		log.Info("Sending welcome email to new regular member",
+			slog.String("user", userLogin),
+			slog.String("email", samlEmail))
+
+		// Make sure we have an email client
+		if ctx.EmailClient == nil {
+			err := fmt.Errorf("email client is not initialized")
+			log.Error("Cannot send welcome email", slog.Any("error", err))
+			// Don't return an error to the webhook caller - just log the issue
+			// We don't want to fail the entire webhook because of email issues
+		} else {
+			if err := ctx.EmailClient.SendWelcomeEmail(samlEmail, userLogin); err != nil {
+				log.Error("Failed to send welcome email",
 					slog.String("email", samlEmail),
-					slog.String("userGroup", ctx.UserGroupID))
-
-				if err := ctx.SlackClient.AddUserToUserGroup(samlEmail, ctx.UserGroupID); err != nil {
-					log.Error("Failed to add user to Slack user group",
-						slog.String("email", samlEmail),
-						slog.Any("error", err))
-					http.Error(w, "Failed to update Slack user group", http.StatusInternalServerError)
-					return
-				}
-
-				log.Info("Successfully added user to Slack user group",
-					slog.String("email", samlEmail),
-					slog.String("userGroup", ctx.UserGroupID))
-			} else if payload.Action == "member_removed" || payload.Action == "deleted" {
-				// Remove the user from the Slack user group
-				log.Info("Removing user from Slack user group",
-					slog.String("email", samlEmail),
-					slog.String("userGroup", ctx.UserGroupID))
-
-				if err := ctx.SlackClient.RemoveUserFromUserGroup(samlEmail, ctx.UserGroupID); err != nil {
-					log.Error("Failed to remove user from Slack user group",
-						slog.String("email", samlEmail),
-						slog.Any("error", err))
-					http.Error(w, "Failed to update Slack user group", http.StatusInternalServerError)
-					return
-				}
-
-				log.Info("Successfully removed user from Slack user group",
-					slog.String("email", samlEmail),
-					slog.String("userGroup", ctx.UserGroupID))
-			}
-		} else if payload.Action == "member_added" {
-			// For regular members, send a welcome email with security guidelines
-			log.Info("Sending welcome email to new regular member",
-				slog.String("user", userLogin),
-				slog.String("email", samlEmail))
-
-			// Make sure we have an email client
-			if ctx.EmailClient == nil {
-				err := fmt.Errorf("email client is not initialized")
-				log.Error("Cannot send welcome email", slog.Any("error", err))
-				// Don't return an error to the webhook caller - just log the issue
-				// We don't want to fail the entire webhook because of email issues
+					slog.String("user", userLogin),
+					slog.Any("error", err))
+				// Don't return an error to the webhook caller
 			} else {
-				if err := ctx.EmailClient.SendWelcomeEmail(samlEmail, userLogin); err != nil {
-					log.Error("Failed to send welcome email",
-						slog.String("email", samlEmail),
-						slog.String("user", userLogin),
-						slog.Any("error", err))
-					// Don't return an error to the webhook caller
-				} else {
-					log.Info("Successfully sent welcome email to new member",
-						slog.String("user", userLogin),
-						slog.String("email", samlEmail))
-				}
+				log.Info("Successfully sent welcome email to new member",
+					slog.String("user", userLogin),
+					slog.String("email", samlEmail))
 			}
 		}
-	} else if payload.Action == "member_invited" {
-		// For invited members, we could potentially send an email to the invitation email
-		if payload.Invitation.Email != "" {
-			log.Info("User was invited, could send welcome email to invitation address",
-				slog.String("email", payload.Invitation.Email))
 
-			// We might choose to send a welcome email to the invitation address
-			// For now, we're just logging and not sending
-		}
 	}
 
 	w.WriteHeader(http.StatusOK)

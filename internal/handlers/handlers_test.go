@@ -11,16 +11,7 @@ import (
 	"testing"
 
 	"github.com/navikt/appsec-github-watcher/internal/msgraph"
-	"github.com/navikt/appsec-github-watcher/internal/slack"
 )
-
-// createMockSlackClient creates a mock Slack client for testing
-func createMockSlackClient() *slack.MockSlackClient {
-	return &slack.MockSlackClient{
-		AddedEmails:   []string{},
-		RemovedEmails: []string{},
-	}
-}
 
 // createMockEmailClient creates a mock Email client for testing
 func createMockEmailClient() *msgraph.MockEmailClient {
@@ -36,12 +27,9 @@ func generateHMAC(body []byte, secret string) string {
 }
 
 func TestNewMemberHandler_MethodNotAllowed(t *testing.T) {
-	mockSlack := createMockSlackClient()
 	mockEmail := createMockEmailClient()
 	ctx := HandlerContext{
-		SlackClient:   mockSlack,
 		EmailClient:   mockEmail,
-		UserGroupID:   "test-group",
 		WebhookSecret: "secret",
 	}
 
@@ -56,12 +44,9 @@ func TestNewMemberHandler_MethodNotAllowed(t *testing.T) {
 }
 
 func TestNewMemberHandler_MissingSignature(t *testing.T) {
-	mockSlack := createMockSlackClient()
 	mockEmail := createMockEmailClient()
 	ctx := HandlerContext{
-		SlackClient:   mockSlack,
 		EmailClient:   mockEmail,
-		UserGroupID:   "test-group",
 		WebhookSecret: "secret",
 	}
 
@@ -76,12 +61,9 @@ func TestNewMemberHandler_MissingSignature(t *testing.T) {
 }
 
 func TestNewMemberHandler_InvalidHMAC(t *testing.T) {
-	mockSlack := createMockSlackClient()
 	mockEmail := createMockEmailClient()
 	ctx := HandlerContext{
-		SlackClient:   mockSlack,
 		EmailClient:   mockEmail,
-		UserGroupID:   "test-group",
 		WebhookSecret: "secret",
 	}
 
@@ -98,12 +80,9 @@ func TestNewMemberHandler_InvalidHMAC(t *testing.T) {
 }
 
 func TestNewMemberHandler_InvalidJSON(t *testing.T) {
-	mockSlack := createMockSlackClient()
 	mockEmail := createMockEmailClient()
 	ctx := HandlerContext{
-		SlackClient:   mockSlack,
 		EmailClient:   mockEmail,
-		UserGroupID:   "test-group",
 		WebhookSecret: "secret",
 	}
 
@@ -122,18 +101,6 @@ func TestNewMemberHandler_InvalidJSON(t *testing.T) {
 }
 
 func TestClientsErrors(t *testing.T) {
-	t.Run("handles Slack AddUserToUserGroup error", func(t *testing.T) {
-		mockSlack := createMockSlackClient()
-		mockSlack.AddUserError = errors.New("slack error")
-		// We can't fully test the member_added flow without mocking the GraphQL client
-	})
-
-	t.Run("handles Slack RemoveUserFromUserGroup error", func(t *testing.T) {
-		mockSlack := createMockSlackClient()
-		mockSlack.RemoveUserError = errors.New("slack error")
-		// We can't fully test the member_removed flow without mocking the GraphQL client
-	})
-
 	t.Run("handles Email SendWelcomeEmail error", func(t *testing.T) {
 		mockEmail := createMockEmailClient()
 		mockEmail.SendEmailError = errors.New("email error")

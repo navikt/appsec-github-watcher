@@ -1,0 +1,33 @@
+apiVersion: nais.io/v1
+kind: Naisjob
+metadata:
+  labels:
+    team: appsec
+  name: appsec-slack-updater
+  namespace: appsec
+spec:
+  image: "{{ image }}"
+  schedule: "0 */6 * * *" # Every 6 hours
+  ttlSecondsAfterFinished: 300
+  resources:
+    limits:
+      memory: "32Mi"
+    requests:
+      cpu: "10m"
+      memory: "16Mi"
+  envFrom:
+    - secret: appsec-github-watcher
+  accessPolicy:
+    outbound:
+      external:
+        - host: api.github.com
+        - host: slack.com
+  observability:
+    logging:
+      destinations:
+        - id: loki
+  env:
+    - name: SLACK_USERGROUP_ID
+      value: "S0604QSJC"
+    - name: GITHUB_ORGANIZATION
+      value: "navikt"

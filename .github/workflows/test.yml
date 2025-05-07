@@ -18,5 +18,5 @@ jobs:
       - run: go test ./...
       - name: Build docker image for both applications
         run: |
-         docker build --build-arg app=appsec-github-watcher .
-         docker build --build-arg app=appsec-slack-updater .
+         docker build --build-arg APP=appsec-github-watcher .
+         docker build --build-arg APP=appsec-slack-updater .

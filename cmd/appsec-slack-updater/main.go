@@ -155,12 +155,11 @@ func main() {
 	// Update the Slack user group if necessary
 	if needsUpdate {
 		log.Info("Updating Slack user group with GitHub admin list", slog.Int("userCount", len(adminSlackIDs)))
-		/* DEBUG: Lets wait with the update for now (:
 		err = slackClient.UpdateUsergroupMembers(slackUserGroupId, adminSlackIDs)
 		if err != nil {
 			log.Error("Failed to update Slack user group members", slog.Any("error", err))
 			os.Exit(1)
-		}*/
+		}
 		log.Info("Successfully updated Slack user group with GitHub admins")
 	} else {
 		log.Info("Slack user group already matches GitHub admins, no update needed")

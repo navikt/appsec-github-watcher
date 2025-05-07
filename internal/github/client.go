@@ -79,7 +79,8 @@ func CreateGitHubAppTransport(config *GitHubAppConfig) (http.RoundTripper, error
 // CreateGitHubAppToken creates an access token for GitHub API using the provided transport
 func CreateGitHubAppToken(ctx context.Context, config *GitHubAppConfig) (string, error) {
 	tr := http.DefaultTransport
-	appsTransport, err := ghinstallation.NewAppsTransport(tr, config.InstallationID, config.PrivateKey)
+	// Fix: Use AppID instead of InstallationID for the second parameter
+	appsTransport, err := ghinstallation.NewAppsTransport(tr, config.AppID, config.PrivateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to create GitHub apps transport: %w", err)
 	}

@@ -320,3 +320,182 @@ func TestVerifySlackSignature(t *testing.T) {
 		}
 	})
 }
+
+func TestGetUsergroupMembers(t *testing.T) {
+	var (
+		userGroupID     = "S999"
+		groupMembers    = []string{"U111", "U222", "U333"}
+		calledEndpoints = []string{}
+	)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calledEndpoints = append(calledEndpoints, r.URL.Path)
+
+		if strings.Contains(r.URL.String(), "usergroups.users.list") {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":    true,
+				"users": groupMembers,
+			})
+			return
+		}
+
+		// Default response for unhandled requests
+		t.Logf("Unhandled request: %s", r.URL.String())
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+	}))
+	defer ts.Close()
+
+	api := slack.New("token",
+		slack.OptionHTTPClient(ts.Client()),
+		slack.OptionAPIURL(ts.URL+"/"))
+	client := &slackClient{api: api}
+
+	// Test successful call
+	result, err := client.GetUsergroupMembers(userGroupID)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(calledEndpoints) != 1 {
+		t.Errorf("expected 1 API call, got %d: %v", len(calledEndpoints), calledEndpoints)
+	}
+
+	if len(result.Users) != len(groupMembers) {
+		t.Errorf("expected %d users, got %d", len(groupMembers), len(result.Users))
+	}
+
+	// Check that all group members are included in the result
+	for i, member := range groupMembers {
+		if result.Users[i] != member {
+			t.Errorf("expected user ID %s at position %d, got %s", member, i, result.Users[i])
+		}
+	}
+}
+
+func TestGetUserIDsByEmails(t *testing.T) {
+	var (
+		emails = []string{
+			"user1@example.com",
+			"user2@example.com",
+			"unknown@example.com", // This one will return "not found"
+			"user3@example.com",
+		}
+		userMap = map[string]string{
+			"user1@example.com": "U111",
+			"user2@example.com": "U222",
+			"user3@example.com": "U333",
+		}
+		notFoundEmail = "unknown@example.com"
+	)
+
+	// Create a client without a mock server to test directly with our lookup function
+	client := &slackClient{api: slack.New("dummy-token")}
+
+	// Call our custom method with a mock lookup function that simulates the Slack API
+	userIDs, notFound, err := client.GetUserIDsByEmailsWithLookup(emails, func(email string) (*slack.User, error) {
+		if email == notFoundEmail {
+			return nil, fmt.Errorf("users_not_found")
+		}
+
+		userID, exists := userMap[email]
+		if exists {
+			return &slack.User{ID: userID}, nil
+		}
+
+		return nil, fmt.Errorf("users_not_found")
+	})
+
+	// Test results
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Should find 3 user IDs
+	expectedFoundCount := 3
+	if len(userIDs) != expectedFoundCount {
+		t.Errorf("expected %d user IDs, got %d", expectedFoundCount, len(userIDs))
+	}
+
+	// Should have 1 not found email
+	expectedNotFoundCount := 1
+	if len(notFound) != expectedNotFoundCount {
+		t.Errorf("expected %d not found emails, got %d: %v", expectedNotFoundCount, len(notFound), notFound)
+	}
+
+	if len(notFound) > 0 && notFound[0] != notFoundEmail {
+		t.Errorf("expected not found email to be %s, got %s", notFoundEmail, notFound[0])
+	}
+
+	// Check that all found user IDs are correct
+	foundMap := make(map[string]bool)
+	for _, id := range userIDs {
+		foundMap[id] = true
+	}
+
+	for email, expectedID := range userMap {
+		if email != notFoundEmail && !foundMap[expectedID] {
+			t.Errorf("expected to find user ID %s for email %s, but it was not in the result", expectedID, email)
+		}
+	}
+}
+
+func TestUpdateUsergroupMembers(t *testing.T) {
+	var (
+		userGroupID     = "S999"
+		userIDs         = []string{"U111", "U222", "U333"}
+		calledEndpoints = []string{}
+		requestBodies   = make(map[string]string)
+	)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calledEndpoints = append(calledEndpoints, r.URL.Path)
+
+		if r.Method == http.MethodPost && strings.Contains(r.URL.String(), "usergroups.users.update") {
+			// Check that the request body contains our user IDs
+			if err := r.ParseForm(); err == nil {
+				requestBodies[r.URL.Path] = r.Form.Get("users")
+			}
+
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok": true,
+			})
+			return
+		}
+
+		// Default response for unhandled requests
+		t.Logf("Unhandled request: %s", r.URL.String())
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+	}))
+	defer ts.Close()
+
+	api := slack.New("token",
+		slack.OptionHTTPClient(ts.Client()),
+		slack.OptionAPIURL(ts.URL+"/"))
+	client := &slackClient{api: api}
+
+	// Test successful update
+	err := client.UpdateUsergroupMembers(userGroupID, userIDs)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(calledEndpoints) != 1 {
+		t.Errorf("expected 1 API call, got %d: %v", len(calledEndpoints), len(calledEndpoints))
+	}
+
+	// Check that the update request contained the right user IDs
+	for path, body := range requestBodies {
+		if strings.Contains(path, "usergroups.users.update") {
+			expectedBody := strings.Join(userIDs, ",")
+			if body != expectedBody {
+				t.Errorf("expected request body to be %s, got %s", expectedBody, body)
+			}
+		}
+	}
+
+	// Test with empty user list (should return error)
+	err = client.UpdateUsergroupMembers(userGroupID, []string{})
+	if err == nil {
+		t.Errorf("expected error when updating with empty user list, got nil")
+	}
+}

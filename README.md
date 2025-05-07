@@ -2,14 +2,24 @@
 
 ## Description
 
-The appsec-github-watcher is a Go-based application that monitors GitHub organization membership changes through webhooks and automates security-related tasks. It provides the following key features:
+This repository contains two Go-based applications that work together to help manage GitHub organization security and Slack group memberships:
 
-- **GitHub Organization Monitoring**: Listens to webhooks for member additions, removals, and invitations in a GitHub organization
-- **GitHub Owners Management**: Automatically adds organization owners to a dedicated Slack usergroup for improved communication and coordination
+### 1. appsec-github-watcher
+
+A web API that monitors GitHub organization membership changes through webhooks and automates security-related tasks:
+
+- **GitHub Organization Monitoring**: Listens to webhooks for member additions, removals, and invitations
 - **User Onboarding**: Sends welcome emails to new organization members with security best practices and guidelines
-- **Security Compliance**: Helps maintain organizational security standards by ensuring all owners have proper Slack access and new members receive security guidance
+- **Security Compliance**: Helps maintain organizational security standards by ensuring new members receive security guidance
 
-The application integrates with GitHub's API (including GraphQL for SSO email retrieval), Slack's API for usergroup management, and Microsoft Graph API for sending emails. It's designed to run as a standalone service or within a container.
+### 2. appsec-slack-updater
+
+A scheduled job that synchronizes GitHub organization administrators with a Slack usergroup:
+
+- **Admin Synchronization**: Automatically updates a dedicated Slack usergroup with all GitHub organization admins
+- **SSO Email Integration**: Uses GitHub GraphQL API to retrieve SSO email addresses for mapping between systems
+
+Both applications integrate with GitHub's API (including GraphQL for SSO email retrieval). appsec-slack-updater with Slack's API for usergroup management. The appsec-github-watcher additionally uses Microsoft Graph API for sending welcome emails.
 
 ## Environment variables required at runtime:
 
@@ -25,7 +35,7 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 
 #### Required GitHub Permissions
 - **Organization**:
-  - `members`: `read` - To receive webhooks for membership changes
+  - `members`: `read` - To receive webhooks for membership changes and list admins
   - `administration`: `read` - To access organization information
 - **Repository**:
   - `metadata`: `read` - Basic repository access
@@ -39,6 +49,7 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 
 ### Slack Integration
 - `SLACK_BOT_TOKEN` The Bot User OAuth Token for the Slack application. You can obtain this from your Slack App settings under "OAuth & Permissions" > "Bot User OAuth Token".
+- `SLACK_USER_GROUP_ID` The ID of the Slack usergroup to synchronize with GitHub admins (required for slack-updater)
 
 #### Required Slack Scopes
 - `usergroups:read` - To read the list of users in a user group
@@ -46,7 +57,7 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 - `users:read` - To read user information
 - `users:read.email` - To look up users by email address
 
-### Azure (for Email Service)
+### Azure (for Email Service - only required for github-watcher with email functionality enabled)
 - `AZURE_APP_CLIENT_ID` - Azure AD application client ID
 - `AZURE_APP_TENANT_ID` - Azure AD tenant ID
 - `AZURE_APP_CLIENT_SECRET` - Azure AD client secret
@@ -61,8 +72,9 @@ The application integrates with GitHub's API (including GraphQL for SSO email re
 
 1. Install dependencies: `go mod tidy`
 2. Configure environment variables as listed above
-3. Run the application: `go run cmd/appsec-github-watcher/main.go`
-4. Build the Docker image: `docker build .`
+3. Run the GitHub watcher application: `go run cmd/appsec-github-watcher/main.go`
+4. Run the Slack updater application: `go run cmd/appsec-slack-updater/main.go`
+5. Build the Docker image: `docker build .`
 
 ## Email Templates
 

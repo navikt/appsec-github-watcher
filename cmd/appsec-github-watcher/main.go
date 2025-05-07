@@ -8,11 +8,6 @@ import (
 
 	"github.com/navikt/appsec-github-watcher/internal/handlers"
 	"github.com/navikt/appsec-github-watcher/internal/msgraph"
-	"github.com/navikt/appsec-github-watcher/internal/slack"
-)
-
-const (
-	slackUserGroupId = "S0604QSJC"
 )
 
 func main() {
@@ -25,13 +20,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Initialize Slack client
-	slackClient, err := slack.NewSlackClient()
-	if err != nil {
-		log.Error("Failed to initialize Slack client", slog.Any("error", err))
-		os.Exit(1)
-	}
-
 	// Check feature toggle for email functionality
 	var emailClient msgraph.EmailClient
 	enableEmail := isFeatureEnabled("ENABLE_EMAIL_FUNCTIONALITY")
@@ -39,6 +27,7 @@ func main() {
 	if enableEmail {
 		log.Info("Email functionality is enabled, initializing MS Graph client")
 		// Initialize MS Graph email client
+		var err error
 		emailClient, err = msgraph.NewEmailClient()
 		if err != nil {
 			log.Error("Failed to initialize MS Graph email client", slog.Any("error", err))
@@ -51,9 +40,7 @@ func main() {
 
 	// Create a handler context with dependencies
 	handlerCtx := handlers.HandlerContext{
-		SlackClient:   slackClient,
 		EmailClient:   emailClient, // Will be nil if feature is disabled
-		UserGroupID:   slackUserGroupId,
 		WebhookSecret: webhookSecretKey,
 	}
 
@@ -63,6 +50,11 @@ func main() {
 	http.HandleFunc("/memberEvent", func(w http.ResponseWriter, r *http.Request) {
 		handlerCtx.NewMemberHandler(w, r)
 	})
+	if enableEmail {
+		http.HandleFunc("/emailEvent", func(w http.ResponseWriter, r *http.Request) {
+			handlerCtx.EmailEventHandler(w, r)
+		})
+	}
 
 	// Start the server
 	log.Info("Server listening on port 8080")

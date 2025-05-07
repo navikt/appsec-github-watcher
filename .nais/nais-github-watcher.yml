@@ -38,6 +38,8 @@ spec:
         - host: slack.com
   env:
     - name: EMAIL_FROM_ADDRESS
-      value: "appsec@nav.no"
+      value: "ikkesvar.appsec@nav.no"
     - name: ENABLE_EMAIL_FUNCTIONALITY
       value: "false"
+    - name: GITHUB_ORGANIZATION
+      value: "navikt"

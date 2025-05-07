@@ -1,4 +1,4 @@
-name: Run tests & build image
+name: Run tests & build images
 on:
   push:
     branches-ignore:
@@ -16,4 +16,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - run: go test ./...
-      - run: docker build .
+      - name: Build docker image for both applications
+        run: |
+         docker build --build-arg APP=appsec-github-watcher .
+         docker build --build-arg APP=appsec-slack-updater .

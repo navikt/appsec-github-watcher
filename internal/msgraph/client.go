@@ -93,7 +93,7 @@ func CreateEmailGraphClient() (EmailClient, error) {
 	// Create Graph service client with permissions for sending mail
 	graphClient, err := graph.NewGraphServiceClientWithCredentials(
 		credential,
-		[]string{"https://graph.microsoft.com/.default", "Mail.Send"},
+		[]string{"https://graph.microsoft.com/.default"},
 	)
 
 	if err != nil {

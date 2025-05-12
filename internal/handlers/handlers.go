@@ -142,6 +142,12 @@ func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Reque
 			slog.String("user", userLogin),
 			slog.String("email", samlEmail))
 
+		shouldDebug := os.Getenv("ENABLE_EMAIL_ENDPOINT")
+		if shouldDebug == "true" {
+			log.Info("Debug mode is enabled, skipping email sending for user", slog.String("user", userLogin))
+			return
+		}
+
 		// Make sure we have an email client
 		if ctx.EmailClient == nil {
 			err := fmt.Errorf("email client is not initialized")

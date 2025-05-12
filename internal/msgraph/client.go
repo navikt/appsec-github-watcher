@@ -149,12 +149,6 @@ func (g *graphSDKClient) SendWelcomeEmail(userEmail string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	debugMail := os.Getenv("DEBUG_EMAIL")
-	if debugMail != "" {
-		log.Info("Debug mail enabled, not sending email")
-		return nil
-	}
-
 	// Send the email
 	err = g.graphClient.Users().ByUserId(g.fromEmail).SendMail().Post(ctx, requestBody, nil)
 	if err != nil {

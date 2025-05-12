@@ -50,7 +50,7 @@ func main() {
 	http.HandleFunc("/memberEvent", func(w http.ResponseWriter, r *http.Request) {
 		handlerCtx.NewMemberHandler(w, r)
 	})
-	if isFeatureEnabled("DEBUG_EMAIL") {
+	if isFeatureEnabled("ENABLE_EMAIL_ENDPOINT") {
 		http.HandleFunc("/emailEvent", func(w http.ResponseWriter, r *http.Request) {
 			handlerCtx.EmailEventHandler(w, r)
 		})

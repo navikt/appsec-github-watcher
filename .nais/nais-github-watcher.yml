@@ -39,7 +39,7 @@ spec:
     - name: EMAIL_FROM_ADDRESS
       value: "ikke.svar.appsec@nav.no"
     - name: ENABLE_EMAIL_FUNCTIONALITY
-      value: "false"
+      value: "true"
     - name: GITHUB_ORGANIZATION
       value: "navikt"
     - name: ENABLE_EMAIL_ENDPOINT

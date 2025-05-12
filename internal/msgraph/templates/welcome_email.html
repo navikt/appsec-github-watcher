@@ -1,45 +1,26 @@
 <!DOCTYPE html>
-<html>
+<html lang="no">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to Our GitHub Organization</title>
+    <title>Velkommen</title>
 </head>
-<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: #24292e;">Welcome to Our GitHub Organization!</h1>
-    </div>
-    
-    <p>Hello {{.UserName}},</p>
-    
-    <p>We're excited to welcome you to our GitHub organization. As a new member, we want to make sure you're familiar with our security best practices.</p>
-    
-    <h2 style="color: #24292e; margin-top: 20px;">GitHub Security Best Practices</h2>
-    
-    <ul style="padding-left: 20px;">
-        <li><strong>Enable Two-Factor Authentication:</strong> 2FA is required for all members. Please ensure it's set up on your GitHub account.</li>
-        <li><strong>Use SSH keys:</strong> For repository access, use SSH keys instead of passwords whenever possible.</li>
-        <li><strong>Be careful with secrets:</strong> Never commit API keys, passwords, or other secrets to repositories.</li>
-        <li><strong>Keep dependencies updated:</strong> Regularly update dependencies to avoid security vulnerabilities.</li>
-        <li><strong>Review code changes:</strong> All code should be peer-reviewed before merging to main branches.</li>
-        <li><strong>Understand repository permissions:</strong> Only request access to repositories you need to work with.</li>
+<body>
+    <h1>Velkommen!</h1>
+    <p>Velkommen til Navikt! Her er noen tips og ressurser for å komme i gang på en effektiv måte:</p>
+    <ul>
+        <li><strong>Håndtering av hemmeligheter</strong>: Sørg alltid for at sensitiv informasjon, som API-nøkler og passord, lagres sikkert. Unngå å legge hemmeligheter inn i koden.</li>
+        <li><strong>Personopplysninger</strong>: Personidentifiserbar informasjon skal aldri lagres på GitHub. Dette inkluderer personnumre, adresser, kontaktinformasjon og annen personlig data.</li>
     </ul>
-    
-    <h2 style="color: #24292e; margin-top: 20px;">Useful Resources</h2>
-    
-    <ul style="padding-left: 20px;">
-        <li><a href="https://docs.github.com/en/authentication/securing-your-account-with-two-factor-authentication-2fa" style="color: #0366d6;">Setting up 2FA</a></li>
-        <li><a href="https://docs.github.com/en/authentication/connecting-to-github-with-ssh" style="color: #0366d6;">Using SSH with GitHub</a></li>
-        <li><a href="https://docs.github.com/en/github/administering-a-repository/configuration-options-for-dependency-updates" style="color: #0366d6;">Dependabot configuration</a></li>
+    <h2>Viktige ressurser:</h2>
+    <ul>
+        <li><a href="https://sikkerhet.nav.no" target="_blank">Security Playbook (Sikkerhetsrelaterte tips & tricks)</a></li>
+        <li><a href="https://utvikling.intern.nav.no" target="_blank">Tekniske Retningslinjer</a></li>
+        <li><a href="https://github.com/navikt/offentlig" target="_blank">GitHub-retningslinjer for åpen kildekode</a></li>
     </ul>
+    <p>Utforsk disse ressursene for å sikre samsvar og gode praksiser i dine bidrag.</p>
     
-    <p style="margin-top: 30px;">If you have any questions about our GitHub security policies or need assistance, please don't hesitate to reach out to the security team.</p>
-    
-    <p>Best regards,<br>
-    The AppSec Team</p>
-    
-    <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #6a737d; text-align: center;">
-        <p>This is an automated message. Please do not reply to this email.</p>
-    </div>
+    <h2>Trenger du hjelp?</h2>
+    <p>Team AppSec er alltid tilgjengelig for å hjelpe deg med spørsmål om sikkerhet, beste praksis eller andre utfordringer. Ikke nøl med å kontakte oss på Slack-kanalen <strong>#appsec</strong>.</p>
 </body>
 </html>

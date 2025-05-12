@@ -32,3 +32,4 @@ We follow the server project module layout from go.dev: Server projects typicall
 9. We will use the go embed package to include email templates directly in the compiled binary.
 10. We keep code as clean as possible and avoid code duplication, unnecessary complexity and long functions.
 11. We always clean up code that is not used.
+12. Don't keep legacy code, strive to remove as much code as possible when implementing new changes.

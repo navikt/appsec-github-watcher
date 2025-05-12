@@ -5,16 +5,16 @@ import (
 	"bytes"
 	"context"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"text/template"
 	"time"
 
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/clientcredentials"
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	graph "github.com/microsoftgraph/msgraph-sdk-go"
+	graphmodels "github.com/microsoftgraph/msgraph-sdk-go/models"
+	"github.com/microsoftgraph/msgraph-sdk-go/users"
 )
 
 const (
@@ -23,20 +23,19 @@ const (
 	baseDelay              = 100 * time.Millisecond
 )
 
-//go:embed templates/*.html
+//go:embed templates/*.html templates/*.md
 var templateFS embed.FS
 
 var log = slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 // EmailClient handles sending emails via Microsoft Graph API
 type EmailClient interface {
-	SendWelcomeEmail(userEmail, userName string) error
+	SendWelcomeEmail(userEmail string) error
 }
 
 // SentEmail represents an email that was sent for testing
 type SentEmail struct {
-	Email    string
-	UserName string
+	Email string
 }
 
 // MockEmailClient implements the EmailClient interface for testing
@@ -46,30 +45,31 @@ type MockEmailClient struct {
 }
 
 // SendWelcomeEmail mocks sending a welcome email for testing
-func (m *MockEmailClient) SendWelcomeEmail(userEmail, userName string) error {
+func (m *MockEmailClient) SendWelcomeEmail(userEmail string) error {
 	if m.SendEmailError != nil {
 		return m.SendEmailError
 	}
 	m.SentEmails = append(m.SentEmails, SentEmail{
-		Email:    userEmail,
-		UserName: userName,
+		Email: userEmail,
 	})
 	return nil
 }
 
-// graphClient implements EmailClient interface
-type graphClient struct {
-	httpClient *http.Client
-	fromEmail  string
-	baseURL    string // Added to make testing easier
+// GraphSDKClient implements EmailClient interface using the Microsoft Graph SDK
+type graphSDKClient struct {
+	graphClient *graph.GraphServiceClient
+	fromEmail   string
 }
 
-// NewEmailClient creates a new MS Graph API client for sending emails
-func NewEmailClient() (EmailClient, error) {
-	token, err := getOAuthToken()
-	if err != nil {
-		log.Error("Failed to get OAuth token for MS Graph", slog.Any("error", err))
-		return nil, fmt.Errorf("unable to get MS Graph token: %w", err)
+// CreateEmailGraphClient creates a new MS Graph API client for sending emails using the official SDK
+func CreateEmailGraphClient() (EmailClient, error) {
+	// Get environment variables
+	tenantID := os.Getenv("AZURE_APP_TENANT_ID")
+	clientID := os.Getenv("AZURE_APP_CLIENT_ID")
+	clientSecret := os.Getenv("AZURE_APP_CLIENT_SECRET")
+
+	if tenantID == "" || clientID == "" || clientSecret == "" {
+		return nil, fmt.Errorf("missing required environment variables: AZURE_APP_CLIENT_ID, AZURE_APP_CLIENT_SECRET, or AZURE_APP_TENANT_ID")
 	}
 
 	fromEmail := os.Getenv("EMAIL_FROM_ADDRESS")
@@ -78,182 +78,95 @@ func NewEmailClient() (EmailClient, error) {
 		log.Info("Using default sender email address", slog.String("email", fromEmail))
 	}
 
-	client := &graphClient{
-		httpClient: &http.Client{
-			Transport: &oauth2.Transport{
-				Source: oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token}),
-				Base:   http.DefaultTransport,
-			},
-		},
-		fromEmail: fromEmail,
-		baseURL:   defaultGraphAPIBaseURL,
-	}
+	// Create credential using environment variables
+	credential, err := azidentity.NewClientSecretCredential(
+		tenantID,
+		clientID,
+		clientSecret,
+		&azidentity.ClientSecretCredentialOptions{})
 
-	log.Info("Created MS Graph email client")
-	return client, nil
-}
-
-// For testing purposes
-func newEmailClientWithHTTPClient(httpClient *http.Client, fromEmail, baseURL string) EmailClient {
-	if baseURL == "" {
-		baseURL = defaultGraphAPIBaseURL
-	}
-	return &graphClient{
-		httpClient: httpClient,
-		fromEmail:  fromEmail,
-		baseURL:    baseURL,
-	}
-}
-
-// getOAuthToken retrieves a token using OAuth2 client credentials flow
-func getOAuthToken() (string, error) {
-	clientID := os.Getenv("AZURE_APP_CLIENT_ID")
-	clientSecret := os.Getenv("AZURE_APP_CLIENT_SECRET")
-	tenantID := os.Getenv("AZURE_APP_TENANT_ID")
-
-	if clientID == "" || clientSecret == "" || tenantID == "" {
-		return "", fmt.Errorf("missing required environment variables: AZURE_APP_CLIENT_ID, AZURE_APP_CLIENT_SECRET, or AZURE_APP_TENANT_ID")
-	}
-
-	tokenEndpoint := os.Getenv("AZURE_OPENID_CONFIG_TOKEN_ENDPOINT")
-	if tokenEndpoint == "" {
-		tokenEndpoint = fmt.Sprintf("https://login.microsoftonline.com/%s/oauth2/v2.0/token", tenantID)
-		log.Info("Using default token endpoint", slog.String("endpoint", tokenEndpoint))
-	}
-
-	config := &clientcredentials.Config{
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		TokenURL:     tokenEndpoint,
-		Scopes:       []string{"https://graph.microsoft.com/.default"},
-	}
-
-	ctx := context.Background()
-	token, err := config.Token(ctx)
 	if err != nil {
-		log.Error("Failed to get MS Graph token", slog.Any("error", err))
-		return "", fmt.Errorf("failed to get token: %w", err)
+		log.Error("Failed to create credential", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to create Azure credential: %w", err)
 	}
 
-	return token.AccessToken, nil
-}
+	// Create Graph service client with permissions for sending mail
+	graphClient, err := graph.NewGraphServiceClientWithCredentials(
+		credential,
+		[]string{"https://graph.microsoft.com/.default", "Mail.Send"},
+	)
 
-// doWithRetry retries the provided function with exponential backoff
-func (g *graphClient) doWithRetry(fn func() error) error {
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = fn()
-		if err == nil {
-			return nil
-		}
-		backoffDuration := baseDelay * (1 << i)
-		log.Info("Retrying MS Graph operation after error",
-			slog.Int("attempt", i+1),
-			slog.Int("maxRetries", maxRetries),
-			slog.Duration("backoff", backoffDuration),
-			slog.Any("error", err))
-		time.Sleep(backoffDuration)
+	if err != nil {
+		log.Error("Failed to create MS Graph client", slog.Any("error", err))
+		return nil, fmt.Errorf("failed to create MS Graph client: %w", err)
 	}
-	return fmt.Errorf("after %d retries, last error: %w", maxRetries, err)
+
+	log.Info("Successfully created MS Graph email client using the SDK")
+	return &graphSDKClient{
+		graphClient: graphClient,
+		fromEmail:   fromEmail,
+	}, nil
 }
 
-// Email represents the JSON structure for sending an email via MS Graph API
-type Email struct {
-	Message struct {
-		Subject      string `json:"subject"`
-		Body         Body   `json:"body"`
-		ToRecipients []struct {
-			EmailAddress struct {
-				Address string `json:"address"`
-			} `json:"emailAddress"`
-		} `json:"toRecipients"`
-	} `json:"message"`
-	SaveToSentItems bool `json:"saveToSentItems"`
-}
+// SendWelcomeEmail sends a welcome email to a new GitHub organization member using the Graph SDK
+func (g *graphSDKClient) SendWelcomeEmail(userEmail string) error {
+	log.Info("Sending welcome email using Graph SDK",
+		slog.String("to", userEmail))
 
-// Body represents the email body content
-type Body struct {
-	ContentType string `json:"contentType"`
-	Content     string `json:"content"`
-}
-
-// SendWelcomeEmail sends a welcome email to a new GitHub organization member
-func (g *graphClient) SendWelcomeEmail(userEmail, userName string) error {
-	log.Info("Sending welcome email", slog.String("to", userEmail), slog.String("userName", userName))
-
-	// Prepare email content
-	subject := "Welcome to the GitHub Organization"
-	emailBody, err := generateWelcomeEmailBody(userName)
+	// Generate email body from template
+	emailBody, err := generateWelcomeEmailBody()
 	if err != nil {
 		log.Error("Failed to generate email body", slog.Any("error", err))
 		return fmt.Errorf("failed to generate email body: %w", err)
 	}
 
-	// Construct the email payload
-	email := Email{}
-	email.Message.Subject = subject
-	email.Message.Body.ContentType = "HTML"
-	email.Message.Body.Content = emailBody
-	email.Message.ToRecipients = []struct {
-		EmailAddress struct {
-			Address string `json:"address"`
-		} `json:"emailAddress"`
-	}{
-		{
-			EmailAddress: struct {
-				Address string `json:"address"`
-			}{
-				Address: userEmail,
-			},
-		},
-	}
-	email.SaveToSentItems = true
+	// Create message
+	message := graphmodels.NewMessage()
+	message.SetSubject(ptr("Velkommen til Navs GitHub-organisasjon!"))
 
-	// Convert to JSON
-	payload, err := json.Marshal(email)
-	if err != nil {
-		log.Error("Failed to marshal email JSON", slog.Any("error", err))
-		return fmt.Errorf("failed to marshal email JSON: %w", err)
-	}
+	// Create body
+	itemBody := graphmodels.NewItemBody()
+	contentType := graphmodels.TEXT_BODYTYPE
+	itemBody.SetContentType(&contentType)
+	itemBody.SetContent(&emailBody)
+	message.SetBody(itemBody)
 
-	// Send the email with retry
-	endpoint := fmt.Sprintf("%s/users/%s/sendMail", g.baseURL, g.fromEmail)
-	err = g.doWithRetry(func() error {
-		req, err := http.NewRequest(http.MethodPost, endpoint, bytes.NewBuffer(payload))
-		if err != nil {
-			return fmt.Errorf("failed to create request: %w", err)
-		}
-		req.Header.Set("Content-Type", "application/json")
+	// Add recipient
+	toRecipient := graphmodels.NewRecipient()
+	emailAddress := graphmodels.NewEmailAddress()
+	emailAddress.SetAddress(&userEmail)
+	toRecipient.SetEmailAddress(emailAddress)
 
-		resp, err := g.httpClient.Do(req)
-		if err != nil {
-			return fmt.Errorf("failed to send email request: %w", err)
-		}
-		defer resp.Body.Close()
+	recipients := []graphmodels.Recipientable{toRecipient}
+	message.SetToRecipients(recipients)
 
-		if resp.StatusCode >= 400 {
-			return fmt.Errorf("email send failed with status code: %d", resp.StatusCode)
-		}
-		return nil
-	})
+	// Create send mail request
+	requestBody := users.NewItemSendMailPostRequestBody()
+	requestBody.SetMessage(message)
+	requestBody.SetSaveToSentItems(boolPtr(false))
 
+	// Create request with context
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Send the email
+	err = g.graphClient.Users().ByUserId(g.fromEmail).SendMail().Post(ctx, requestBody, nil)
 	if err != nil {
 		log.Error("Failed to send welcome email",
 			slog.String("to", userEmail),
 			slog.Any("error", err))
-		return err
+		return fmt.Errorf("failed to send email: %w", err)
 	}
 
-	log.Info("Successfully sent welcome email",
-		slog.String("to", userEmail),
-		slog.String("userName", userName))
+	log.Info("Successfully sent welcome email using Graph SDK",
+		slog.String("to", userEmail))
 	return nil
 }
 
-// generateWelcomeEmailBody creates the HTML body for the welcome email
-func generateWelcomeEmailBody(userName string) (string, error) {
+// generateWelcomeEmailBody creates the markdown body for the welcome email
+func generateWelcomeEmailBody() (string, error) {
 	// Load the template from the embedded file system
-	tmplFile, err := templateFS.ReadFile("templates/welcome_email.html")
+	tmplFile, err := templateFS.ReadFile("templates/welcome_email.md")
 	if err != nil {
 		return "", fmt.Errorf("failed to read email template file: %w", err)
 	}
@@ -264,18 +177,21 @@ func generateWelcomeEmailBody(userName string) (string, error) {
 		return "", fmt.Errorf("failed to parse email template: %w", err)
 	}
 
-	// Add template data
-	data := struct {
-		UserName string
-	}{
-		UserName: userName,
-	}
-
 	// Execute the template
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, data); err != nil {
+	if err := tmpl.Execute(&buf, nil); err != nil {
 		return "", fmt.Errorf("failed to execute email template: %w", err)
 	}
 
 	return buf.String(), nil
+}
+
+// Helper function to create string pointers
+func ptr(s string) *string {
+	return &s
+}
+
+// Helper function to create bool pointers
+func boolPtr(b bool) *bool {
+	return &b
 }

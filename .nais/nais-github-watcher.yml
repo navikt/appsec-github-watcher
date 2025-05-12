@@ -44,3 +44,5 @@ spec:
       value: "navikt"
     - name: DEBUG_EMAIL
       value: "true"
+    - name: ENABLE_EMAIL_ENDPOINT
+      value: "true"

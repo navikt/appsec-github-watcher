@@ -1,6 +1,6 @@
 # Velkommen!
 
-Velkommen til Navikt! Her er noen tips og ressurser for å komme i gang på en effektiv måte:
+Her er noen tips og ressurser for å komme i gang på en effektiv måte:
 
 - **Håndtering av hemmeligheter**: Sørg alltid for at sensitiv informasjon, som API-nøkler og passord, lagres sikkert. Aldri legg hemmeligheter direkte i koden.
 - **Personopplysninger**: Personidentifiserbar informasjon skal aldri lagres på GitHub. Dette inkluderer personnumre, adresser, kontaktinformasjon og annen personlig data.

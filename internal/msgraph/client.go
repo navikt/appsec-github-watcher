@@ -122,7 +122,7 @@ func (g *graphSDKClient) SendWelcomeEmail(userEmail string) error {
 
 	// Create message
 	message := graphmodels.NewMessage()
-	message.SetSubject(ptr("Welcome to the GitHub Organization"))
+	message.SetSubject(ptr("Velkommen til Navs GitHub-organisasjon!"))
 
 	// Create body
 	itemBody := graphmodels.NewItemBody()

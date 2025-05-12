@@ -28,7 +28,7 @@ func main() {
 		log.Info("Email functionality is enabled, initializing MS Graph client")
 		// Initialize MS Graph email client
 		var err error
-		emailClient, err = msgraph.NewEmailClient()
+		emailClient, err = msgraph.CreateEmailGraphClient()
 		if err != nil {
 			log.Error("Failed to initialize MS Graph email client", slog.Any("error", err))
 			// Continue without email functionality rather than failing the application
@@ -50,7 +50,7 @@ func main() {
 	http.HandleFunc("/memberEvent", func(w http.ResponseWriter, r *http.Request) {
 		handlerCtx.NewMemberHandler(w, r)
 	})
-	if enableEmail {
+	if isFeatureEnabled("DEBUG_EMAIL") {
 		http.HandleFunc("/emailEvent", func(w http.ResponseWriter, r *http.Request) {
 			handlerCtx.EmailEventHandler(w, r)
 		})

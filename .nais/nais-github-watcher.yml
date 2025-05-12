@@ -37,8 +37,10 @@ spec:
         - host: api.github.com
   env:
     - name: EMAIL_FROM_ADDRESS
-      value: "ikkesvar.appsec@nav.no"
+      value: "ikke.svar.appsec@nav.no"
     - name: ENABLE_EMAIL_FUNCTIONALITY
       value: "false"
     - name: GITHUB_ORGANIZATION
       value: "navikt"
+    - name: DEBUG_EMAIL
+      value: "true"

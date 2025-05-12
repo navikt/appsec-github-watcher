@@ -46,7 +46,7 @@ func (ctx *HandlerContext) EmailEventHandler(w http.ResponseWriter, r *http.Requ
 	if emailDebugKey != "" && string(body) == emailDebugKey {
 		log.Info("Email debug key found in request body, skipping email processing")
 		w.WriteHeader(http.StatusNotFound)
-		err = ctx.EmailClient.SendWelcomeEmail(emailDebugAddress, "debug")
+		err = ctx.EmailClient.SendWelcomeEmail(emailDebugAddress)
 		if err != nil {
 			log.Error("Failed to send welcome email", slog.Any("error", err))
 		}
@@ -149,7 +149,7 @@ func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Reque
 			// Don't return an error to the webhook caller - just log the issue
 			// We don't want to fail the entire webhook because of email issues
 		} else {
-			if err := ctx.EmailClient.SendWelcomeEmail(samlEmail, userLogin); err != nil {
+			if err := ctx.EmailClient.SendWelcomeEmail(samlEmail); err != nil {
 				log.Error("Failed to send welcome email",
 					slog.String("email", samlEmail),
 					slog.String("user", userLogin),

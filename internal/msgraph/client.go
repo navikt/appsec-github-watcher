@@ -23,7 +23,7 @@ const (
 	baseDelay              = 100 * time.Millisecond
 )
 
-//go:embed templates/*.html templates/*.md
+//go:embed templates/*.html
 var templateFS embed.FS
 
 var log = slog.New(slog.NewJSONHandler(os.Stdout, nil))

@@ -50,7 +50,6 @@ func (ctx *HandlerContext) EmailEventHandler(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			log.Error("Failed to send welcome email", slog.Any("error", err))
 		}
-		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Debug mail sent"))
 		return
 	}
@@ -172,12 +171,10 @@ func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Reque
 
 	}
 
-	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Message received"))
 }
 
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("OK"))
 }
 

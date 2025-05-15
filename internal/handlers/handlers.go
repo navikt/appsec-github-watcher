@@ -50,11 +50,13 @@ func (ctx *HandlerContext) EmailEventHandler(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			log.Error("Failed to send welcome email", slog.Any("error", err))
 		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Debug mail sent"))
+		return
 	}
 
 	// Log the email event
 	log.Info("Received email event", slog.String("body", string(body)))
-
 	w.WriteHeader(http.StatusForbidden)
 }
 

@@ -126,7 +126,7 @@ func (g *graphSDKClient) SendWelcomeEmail(userEmail string) error {
 
 	// Create body
 	itemBody := graphmodels.NewItemBody()
-	contentType := graphmodels.TEXT_BODYTYPE
+	contentType := graphmodels.HTML_BODYTYPE
 	itemBody.SetContentType(&contentType)
 	itemBody.SetContent(&emailBody)
 	message.SetBody(itemBody)
@@ -166,7 +166,7 @@ func (g *graphSDKClient) SendWelcomeEmail(userEmail string) error {
 // generateWelcomeEmailBody creates the markdown body for the welcome email
 func generateWelcomeEmailBody() (string, error) {
 	// Load the template from the embedded file system
-	tmplFile, err := templateFS.ReadFile("templates/welcome_email.md")
+	tmplFile, err := templateFS.ReadFile("templates/welcome_email.html")
 	if err != nil {
 		return "", fmt.Errorf("failed to read email template file: %w", err)
 	}

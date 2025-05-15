@@ -42,5 +42,7 @@ spec:
       value: "true"
     - name: GITHUB_ORGANIZATION
       value: "navikt"
-    - name: ENABLE_EMAIL_ENDPOINT
-      value: "true"
+    # Disables sending emails to users, enables sending to debug address
+    # Variables for debug vars are set in nais console secret
+    - name: ENABLE_EMAIL_DEBUG
+      value: "false"

@@ -50,7 +50,8 @@ func main() {
 	http.HandleFunc("/memberEvent", func(w http.ResponseWriter, r *http.Request) {
 		handlerCtx.NewMemberHandler(w, r)
 	})
-	if isFeatureEnabled("ENABLE_EMAIL_ENDPOINT") {
+	if isFeatureEnabled("ENABLE_EMAIL_DEBUG") {
+		log.Info("Email debug functionality is enabled, will not send emails to new users")
 		http.HandleFunc("/emailEvent", func(w http.ResponseWriter, r *http.Request) {
 			handlerCtx.EmailEventHandler(w, r)
 		})

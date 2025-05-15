@@ -144,7 +144,7 @@ func (ctx *HandlerContext) NewMemberHandler(w http.ResponseWriter, r *http.Reque
 			slog.String("user", userLogin),
 			slog.String("email", samlEmail))
 
-		shouldDebug := os.Getenv("ENABLE_EMAIL_ENDPOINT")
+		shouldDebug := os.Getenv("ENABLE_EMAIL_DEBUG")
 		if shouldDebug == "true" {
 			log.Info("Debug mode is enabled, skipping email sending for user", slog.String("user", userLogin))
 			return

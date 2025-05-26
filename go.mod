@@ -5,8 +5,8 @@ go 1.24.2
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.15.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
-	github.com/slack-go/slack v0.16.0
-	golang.org/x/oauth2 v0.29.0
+	github.com/slack-go/slack v0.17.0
+	golang.org/x/oauth2 v0.30.0
 )
 
 require (
@@ -35,19 +35,19 @@ require (
 	go.opentelemetry.io/otel v1.35.0 // indirect
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
-	golang.org/x/crypto v0.36.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
-	golang.org/x/text v0.23.0 // indirect
+	golang.org/x/crypto v0.38.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/text v0.25.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.0
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/go-github/v71 v71.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/microsoftgraph/msgraph-sdk-go v1.70.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.72.0
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 // indirect
 )

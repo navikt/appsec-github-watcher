@@ -26,7 +26,7 @@ jobs:
           image_suffix: "-gh"
           build_args:
             APP=appsec-github-watcher
-      - uses: nais/deploy/actions/deploy@af6b60d6823a644020e6fdecd11b8d42c82c8515 # ratchet:nais/deploy/actions/deploy@v2
+      - uses: nais/deploy/actions/deploy@d30ad2c21d7862e22d45cac6accfbf42bbbc0f39 # ratchet:nais/deploy/actions/deploy@v2
         env:
           RESOURCE: .nais/nais-github-watcher.yml
           CLUSTER: prod-gcp

@@ -5,7 +5,7 @@ go 1.24.2
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.16.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
-	github.com/slack-go/slack v0.17.0
+	github.com/slack-go/slack v0.17.1
 	golang.org/x/oauth2 v0.30.0
 )
 
@@ -44,10 +44,10 @@ require (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.1
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/microsoftgraph/msgraph-sdk-go v1.72.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.75.0
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 // indirect
 )

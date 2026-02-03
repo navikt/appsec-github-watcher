@@ -6,7 +6,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/shurcooL/githubv4 v0.0.0-20240727222349-48295856cce7
 	github.com/slack-go/slack v0.17.3
-	golang.org/x/oauth2 v0.33.0
+	golang.org/x/oauth2 v0.34.0
 )
 
 require (
@@ -44,6 +44,6 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
-	github.com/microsoftgraph/msgraph-sdk-go v1.90.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.91.0
 	github.com/shurcooL/graphql v0.0.0-20230722043721-ed46e5a46466 // indirect
 )

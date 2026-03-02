@@ -1,11 +1,11 @@
 module github.com/navikt/appsec-github-watcher
 
-go 1.24.2
+go 1.25
 
 require (
 	github.com/bradleyfalzon/ghinstallation/v2 v2.17.0
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
-	github.com/slack-go/slack v0.17.3
+	github.com/slack-go/slack v0.18.0
 	golang.org/x/oauth2 v0.35.0
 )
 

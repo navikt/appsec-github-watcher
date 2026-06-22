@@ -19,7 +19,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - run: go test ./...
-      - uses: nais/docker-build-push@751a312f0803eb96a05a41fadf51be19b7be362c # ratchet:nais/docker-build-push@v0
+      - uses: nais/docker-build-push@05dbb6091b30bd84279c6d64a45ef8782fd410a5 # ratchet:nais/docker-build-push@v0
         id: docker-push
         with:
           team: appsec
@@ -27,7 +27,7 @@ jobs:
           image_suffix: "-slack"
           build_args:
             APP=appsec-slack-updater
-      - uses: nais/deploy/actions/deploy@a7f8690f9b367fcbf5348a0a1e21d44f1aae50eb # ratchet:nais/deploy/actions/deploy@v2
+      - uses: nais/deploy/actions/deploy@5fdd91aaf69bb0d6dd5e5118cdacb639f487b93b # ratchet:nais/deploy/actions/deploy@v2
         env:
           RESOURCE: .nais/nais-slack-updater.yml
           CLUSTER: prod-gcp

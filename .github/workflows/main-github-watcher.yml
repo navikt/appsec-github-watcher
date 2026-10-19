@@ -19,7 +19,7 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - run: go test ./...
-      - uses: nais/docker-build-push@bfe52e3ad6d0e96fd1056a03acb7b619aaffb39d # ratchet:nais/docker-build-push@v0
+      - uses: nais/docker-build-push@dd7421d5068057a020ca46ead966c26190c516b1 # ratchet:nais/docker-build-push@v0
         id: docker-push
         with:
           team: appsec
@@ -27,7 +27,7 @@ jobs:
           image_suffix: "-gh"
           build_args:
             APP=appsec-github-watcher
-      - uses: nais/deploy/actions/deploy@9850be311389ca754d9a9f2280615419d738c891 # ratchet:nais/deploy/actions/deploy@v3
+      - uses: nais/deploy/actions/deploy@d003bddf74ce5b96fa3056ae60bd4b9b3bbc89ef # ratchet:nais/deploy/actions/deploy@v3
         env:
           RESOURCE: .nais/nais-github-watcher.yml
           CLUSTER: prod-gcp

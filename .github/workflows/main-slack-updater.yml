@@ -27,7 +27,7 @@ jobs:
           image_suffix: "-slack"
           build_args:
             APP=appsec-slack-updater
-      - uses: nais/deploy/actions/deploy@d003bddf74ce5b96fa3056ae60bd4b9b3bbc89ef # ratchet:nais/deploy/actions/deploy@v3
+      - uses: nais/deploy/actions/deploy@6a9dcd6df697ec2d38edc78cadb0b9acd1232f50 # ratchet:nais/deploy/actions/deploy@v3
         env:
           RESOURCE: .nais/nais-slack-updater.yml
           CLUSTER: prod-gcp

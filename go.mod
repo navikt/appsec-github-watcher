@@ -5,9 +5,9 @@ go 1.27
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.19.0
-	github.com/microsoftgraph/msgraph-sdk-go v1.105.0
+	github.com/microsoftgraph/msgraph-sdk-go v1.106.0
 	github.com/shurcooL/githubv4 v0.0.0-20260209031235-2402fdf4a9ed
-	github.com/slack-go/slack v0.35.0
+	github.com/slack-go/slack v0.36.0
 	golang.org/x/oauth2 v0.38.0
 )
 
